@@ -246,3 +246,70 @@ Vi försöker ha en komplett fungerande version klar senast torsdag
 
 Sista tiden används till tester, buggrättning, README, screenshots,
 installationstest och förberedelse av redovisningen.
+
+## Aktuell projektstatus
+
+Projektet är under aktiv utveckling. Följande delar är implementerade och
+verifierade.
+
+### Projektgrund och integration
+
+Kalle har satt upp projektets gemensamma grund:
+
+- repository- och projektstruktur
+- gruppkontrakt
+- Git workflow med feature branches, Pull Requests och code review
+- API-kontrakt
+- integrationsdokumentation
+- dokumentation för roller och behörigheter
+- gemensam miljökonfiguration
+- exempelkonfiguration för två servernoder
+- gemensamma npm-scripts
+- lokal setup-guide
+- integrations- och testchecklista
+
+Ändringar utvecklas på separata branches och granskas genom Pull Requests innan
+de mergas till main.
+
+### Backend och authentication
+
+Yamfu har implementerat den första backend- och authentication-grunden.
+
+Följande finns på main:
+
+- Express-backend
+- `GET /api/health`
+- `POST /api/auth/login`
+- bcrypt för lösenordsverifiering
+- JWT-baserad authentication
+- auth middleware
+- skyddad `GET /api/auth/me`
+- testanvändare för rollerna `DOCTOR`, `NURSE`, `CARE_CENTER` och `PATIENT`
+
+Authentication har efter merge verifierats från main genom manuella
+integrationstester.
+
+Verifierade scenarier:
+
+- health endpoint svarar med HTTP 200
+- korrekt login ger HTTP 200 och JWT
+- felaktigt lösenord ger HTTP 401
+- skyddad route med giltig Bearer-token ger HTTP 200
+- skyddad route utan token ger HTTP 401
+- `passwordHash` exponeras inte i API-responsen
+
+### Inte implementerat ännu
+
+Följande delar återstår eller är planerade för kommande iterationer:
+
+- SQL-integration
+- patient-API
+- journal-API
+- blockchain för access logs
+- P2P-synkronisering
+- frontend
+- Socket.io-integration
+- slutlig end-to-end-integration
+
+Medicinsk journaldata ska lagras i SQL och ska inte lagras i blockchain.
+Blockchain används för accessloggning och spårbarhet.
