@@ -174,3 +174,48 @@ Serverdelen är ännu inte implementerad.
 
 Första målet är att få ett enkelt fungerande flöde från backend till
 SQL och blockchain innan mer avancerade funktioner byggs.
+
+## Implementerat i första auth-versionen
+
+Avsnitten ovan bevarar projektets ursprungliga plan och status före denna PR.
+Nu finns Express-grunden och authentication enligt nedan. SQL-integration
+kommer i en senare PR; övrig planerad funktionalitet ovan är inte implementerad
+av denna auth-PR.
+
+### Installation och start
+
+Från projektroten:
+
+```powershell
+npm install --prefix server
+# Endast om .env saknas:
+Copy-Item .env.example .env
+```
+
+Ange ett eget lokalt `JWT_SECRET` i projektrotens `.env`. Variabeln är
+obligatorisk; servern stoppar om den saknas. Committa aldrig `.env` eller
+`node_modules/`. Servern läser rotens `.env` oavsett arbetskatalog.
+`PORT` använder 3001 om den saknas.
+
+Starta från projektroten med `npm run start:server`, eller från `server/`
+med `npm start`. För utveckling finns `npm run dev` i `server/`.
+
+### Tillgängliga routes
+
+- `GET /api/health`: publik, returnerar 200 med
+  `{"status":"ok","service":"patient-journal-backend"}`.
+- `POST /api/auth/login`: tar JSON med `username` och `password`.
+  Returnerar 200 med `token` och `user` (`id`, `name`, `role`, samt
+  `patientId` för PATIENT). Felaktiga uppgifter ger ett generellt 401-svar.
+- `GET /api/auth/me`: kräver `Authorization: Bearer <token>` och returnerar
+  verifierad `user` med `userId`, `role` och eventuellt `patientId`.
+  Saknad eller ogiltig token ger 401.
+
+JWT gäller i en timme. Lösenord och `passwordHash` returneras aldrig.
+
+### Tillfälliga syntetiska användare
+
+`doctor1` (DOCTOR), `nurse1` (NURSE), `carecenter1` (CARE_CENTER) och
+`patient1` (PATIENT, `patientId: 7`) använder testlösenordet `password123`.
+Endast bcrypt-hashar lagras i `src/data/users.js`. Kontona är för lokal testning.
+UNAUTHORIZED beskriver ett obehörigt tillstånd och har inget testkonto.
