@@ -298,6 +298,22 @@ Verifierade scenarier:
 - skyddad route utan token ger HTTP 401
 - `passwordHash` exponeras inte i API-responsen
 
+### Frontend och login
+
+Josef har satt upp frontend-grunden i `client/` med React och Vite.
+
+Följande finns på main:
+
+- login-sida mot `POST /api/auth/login`
+- JWT sparas i utvecklingsversionen och skickas som Bearer-token
+- session kontrolleras mot `GET /api/auth/me` vid refresh
+- namn och roll visas efter login
+- logout
+- rollbaserad startsida (vårdpersonal respektive patient)
+- `npm run install:all` fungerar nu för både server och client
+
+Mer information finns i `client/README.md`.
+
 ### Inte implementerat ännu
 
 Följande delar återstår eller är planerade för kommande iterationer:
@@ -307,7 +323,7 @@ Följande delar återstår eller är planerade för kommande iterationer:
 - journal-API
 - blockchain för access logs
 - P2P-synkronisering
-- frontend
+- patientsökning, journalvy och access logs i frontend
 - Socket.io-integration
 - slutlig end-to-end-integration
 
