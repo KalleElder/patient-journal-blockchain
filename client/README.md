@@ -1,68 +1,120 @@
 # Client
 
-Frontend-delen av Patient Journal Blockchain.
+Frontend-delen av Patient Journal Blockchain. Byggd med React och Vite.
 
 ## Huvudansvarig
 
 Josef
 
-## Ansvarsområde
+## Köra
 
-Frontend ska bland annat innehålla:
+Från projektroten:
 
-- Login
-- Patientsökning
-- Patientvy
-- Journalvy
-- Formulär för att skapa journalanteckningar
-- Val av synlighet för journalanteckningar
-- Access denied-vy
-- Access logs
-- Socket.io-client
-- Liveuppdateringar
-- Realtidsaktivitet
-- Verification badge för blockchain-loggar
+    npm run install:all
+    npm run start:client
 
-## Kommunikation med backend
+Eller direkt i client/:
 
-Frontend ska kommunicera med backend via projektets API.
+    npm install
+    npm run dev
 
-Det gemensamma API-kontraktet finns i:
+Frontend startar på http://localhost:5173.
 
-docs/api-contract.md
+Backend måste köra samtidigt (`npm run start:server`, port 3001).
 
-Frontend ska inte ansluta direkt till SQL-databasen.
+## Backend-URL
 
-## Behörighet
+Frontend anropar alltid relativa sökvägar som `/api/auth/login`. Vites
+dev-server skickar vidare allt under `/api` till backend, se `vite.config.js`.
+Därför behövs ingen CORS-inställning i backend under utveckling.
 
-Frontend kan visa eller dölja funktioner beroende på användarens roll,
-men frontend får aldrig vara den enda säkerhetskontrollen.
+Vilken backend som används styrs av `VITE_API_URL` (default
+`http://localhost:3001`). Kopiera `.env.example` till `.env` om du vill ändra.
 
-Backend ansvarar alltid för den faktiska kontrollen av användarens
-behörighet.
+## Login
 
-## Journaldata
+1. Användaren fyller i användarnamn och lösenord.
+2. Frontend skickar `POST /api/auth/login`.
+3. Vid 200 sparas token och användare, och startsidan visas.
+4. Vid 401 visas "Felaktiga inloggningsuppgifter."
+5. Om backend inte svarar visas "Kunde inte nå servern."
 
-Medicinska journaluppgifter hämtas från backend och lagras i SQL-databasen.
+Rollen kommer alltid från backend. Frontend bestämmer aldrig rollen själv.
 
-Journaltext ska aldrig lagras direkt i blockchain.
+## JWT i utvecklingsversionen
 
-## Realtidsuppdateringar
+Token och användarobjektet sparas i `localStorage` (nycklarna `token` och
+`user`). Alla anrop går genom `src/services/api.js`, som lägger till
+`Authorization: Bearer <token>` när en token finns.
 
-Frontend ska senare kunna använda Socket.io för att ta emot
-realtidsuppdateringar.
+Vid refresh av sidan kollar frontend token mot `GET /api/auth/me`. Svarar
+backend 200 är användaren fortfarande inloggad, annars rensas sessionen och
+login-sidan visas. Utloggning tar bort token och användare från `localStorage`.
 
-Exempel på information som kan visas:
+Det här är en enkel lösning för utvecklingsversionen. `localStorage` är inte
+det säkraste stället för en token, men det räcker för projektet just nu.
 
-- ny journalanteckning
-- uppdaterad journal
-- aktuell aktivitet
-- nya access logs
-- blockchain-verifieringsstatus
+## Roller
 
-## Status
+Frontend känner till exakt de roller backend använder, se `src/roles.js`:
 
-Frontend är ännu inte implementerad.
+- DOCTOR
+- NURSE
+- CARE_CENTER
+- PATIENT
+- UNAUTHORIZED
 
-Frontend-ramverk och den slutliga komponentstrukturen bestäms innan
-Josef påbörjar implementationen.
+DOCTOR, NURSE och CARE_CENTER räknas som vårdpersonal och får startsidan för
+patientsökning. PATIENT får en egen startsida med sitt patient-ID. Alla andra
+roller får "Åtkomst nekad".
+
+Frontend visar eller döljer bara vyer. Backend gör den riktiga
+behörighetskontrollen.
+
+## Struktur
+
+    client/
+    ├── index.html
+    ├── vite.config.js          proxy /api -> backend
+    ├── .env.example
+    └── src/
+        ├── main.jsx
+        ├── App.jsx             login eller startsida beroende på session
+        ├── roles.js            rollerna från backend
+        ├── index.css
+        ├── services/api.js     alla anrop mot backend + tokenhantering
+        ├── pages/LoginPage.jsx
+        ├── pages/HomePage.jsx  rollbaserad startsida
+        └── components/UserBar.jsx
+
+## Testat
+
+Manuellt testat mot Yamfus backend (main):
+
+- frontend startar och login-sidan visas
+- `doctor1` + rätt lösenord loggar in och visar "Roll: DOCTOR"
+- fel lösenord ger "Felaktiga inloggningsuppgifter."
+- `patient1` loggar in, visar "Roll: PATIENT" och patient-ID 7
+- refresh behåller inloggningen via `GET /api/auth/me`
+- logga ut rensar sessionen och visar login-sidan
+- `npm run install:all` från projektroten installerar både server och client
+- `npm run build` bygger utan fel
+
+## Implementerat
+
+- React + Vite i client/
+- login-sida
+- gemensam API-service
+- JWT-hantering
+- visning av namn och roll
+- logout
+- rollbaserad startsida
+
+## Inte implementerat ännu
+
+- patientsökning
+- journalvy
+- skapa journalanteckning
+- access logs
+- Socket.io
+- blockchain verification
