@@ -96,6 +96,21 @@ test('blocket påverkas inte av att anroparen ändrar sitt eget event-objekt', (
   assert.strictEqual(blockchain.isChainValid(), true);
 });
 
+test('ändrad data i genesis block upptäcks', () => {
+  const blockchain = new Blockchain();
+  blockchain.chain[0].data.action = 'HACKED';
+
+  assert.strictEqual(blockchain.isChainValid(), false);
+});
+
+test('ändrad data i genesis block upptäcks även i en längre kedja', () => {
+  const blockchain = new Blockchain();
+  blockchain.addBlock(auditEvent);
+  blockchain.chain[0].data.action = 'HACKED';
+
+  assert.strictEqual(blockchain.isChainValid(), false);
+});
+
 test('ett utbytt genesis block upptäcks', () => {
   const blockchain = new Blockchain();
   blockchain.chain[0] = new Block({
@@ -104,6 +119,13 @@ test('ett utbytt genesis block upptäcks', () => {
     data: { action: 'GENESIS' },
     previousHash: '0',
   });
+
+  assert.strictEqual(blockchain.isChainValid(), false);
+});
+
+test('en tom kedja är ogiltig i stället för att krascha', () => {
+  const blockchain = new Blockchain();
+  blockchain.chain = [];
 
   assert.strictEqual(blockchain.isChainValid(), false);
 });

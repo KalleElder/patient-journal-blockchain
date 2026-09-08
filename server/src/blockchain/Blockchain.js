@@ -40,7 +40,17 @@ class Blockchain {
 
   // Går igenom hela kedjan och kontrollerar att ingenting har ändrats i efterhand.
   isChainValid() {
-    if (this.chain[0].hash !== Blockchain.createGenesisBlock().hash) {
+    if (!Array.isArray(this.chain) || this.chain.length === 0) {
+      return false;
+    }
+
+    const genesis = this.chain[0];
+
+    // Genesis behöver två kontroller. hasValidHash() fångar den som ändrar
+    // innehållet men låter den gamla hashen ligga kvar. Jämförelsen mot ett
+    // nytt genesis-block fångar den som byter ut hela blocket och räknar om
+    // hashen. Ingen av kontrollerna räcker ensam.
+    if (!genesis.hasValidHash() || genesis.hash !== Blockchain.createGenesisBlock().hash) {
       return false;
     }
 

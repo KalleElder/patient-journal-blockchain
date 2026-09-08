@@ -80,13 +80,21 @@ samma genesis block och kan jämföra sina kedjor när P2P byggs.
 
 `isChainValid()` går igenom kedjan och kontrollerar att:
 
-- genesis block är oförändrat
+- kedjan inte är tom
+- genesis-blockets sparade hash stämmer med dess innehåll
+- genesis-blocket är det kanoniska genesis-blocket
 - varje blocks sparade hash stämmer med en omräkning av innehållet
 - varje blocks `previousHash` matchar föregående blocks hash
 - indexen följer på varandra
 
 Ändrar någon data i ett gammalt block räcker det inte att räkna om just det
 blockets hash, eftersom nästa block fortfarande pekar på den gamla hashen.
+
+Genesis behöver två kontroller, inte en. Den som ändrar innehållet men låter
+den gamla hashen ligga kvar fångas av hash-omräkningen. Den som byter ut hela
+blocket och räknar om hashen fångas av jämförelsen mot det kanoniska
+genesis-blocket. Ingen av kontrollerna räcker ensam, eftersom genesis inte har
+något föregående block som kan avslöja en ändring.
 
 ## Gränssnitt mot backend
 
@@ -115,7 +123,7 @@ Från `server/`:
 
     node --test
 
-14 tester ska passera.
+17 tester ska passera.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
 rapporterar den varianten "pass 1" och returnerar 0 även när ett test faktiskt
