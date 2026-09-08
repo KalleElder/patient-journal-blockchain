@@ -98,16 +98,16 @@ Frontendens egna scripts definieras i:
 
 ## 9. Databas
 
-Medicinsk journaldata ska lagras i SQL.
+Medicinsk journaldata ska lagras i SQL. Databasen är SQLite.
 
-Planerade SQL-filer ligger i:
+SQL-filerna ligger i:
 
     database/
 
-Den slutliga databastekniken, porten och installationsprocessen dokumenteras
-när gruppen har låst databaslösningen.
+Kör `npm run db:init` för att skapa databasfilen med tabeller och testdata.
+`DB_PATH` i `.env` styr var filen hamnar (standard: `database/patient_journal.db`).
 
-Databasen ska minst hantera:
+Databasen hanterar minst:
 
 - användare
 - patienter
