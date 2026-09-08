@@ -65,6 +65,19 @@ try {
   console.log(`   Avvisat: ${error.message}\n`);
 }
 
+console.log('5b. Journaltext göms i ett fält som heter rätt');
+try {
+  blockchain.addBlock(buildAuditData({
+    userId: 'Patienten har diabetes typ 2',
+    patientId: 7,
+    role: 'DOCTOR',
+    action: 'READ_JOURNAL',
+    timestamp: new Date().toISOString(),
+  }));
+} catch (error) {
+  console.log(`   Avvisat: ${error.message}\n`);
+}
+
 console.log('6. Någon försöker dölja att patient 7 lästes, genom att');
 console.log('   ändra block 1 till att gälla patient 8');
 blockchain.chain[1].data.patientId = 8;

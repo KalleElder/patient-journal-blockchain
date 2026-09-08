@@ -16,6 +16,16 @@ avvisar alla fält som inte ingår i det gemensamma audit-formatet, så ett anro
 råkar skicka med `content` kastar ett fel i stället för att skriva journaltext till
 kedjan.
 
+Fältnamnen räcker dock inte. Journaltext skulle annars kunna gömmas i ett fält
+som heter rätt, exempelvis `userId: 'Patienten har diabetes typ 2'`. Därför
+kontrolleras även innehållet: `userId` och `patientId` måste vara heltal,
+`action` måste vara en konstant i versaler som `READ_JOURNAL`, `timestamp` måste
+vara en tidsstämpel som sträng, och `role` måste vara en av de fem rollerna.
+Det finns inget fält kvar där fritext får plats.
+
+Den som anropar `Blockchain.addBlock()` direkt går förbi kontrollen. Backend ska
+därför alltid gå via `createAuditLog()`.
+
 ## Filer
 
 | Fil | Ansvar |
@@ -90,6 +100,21 @@ samma genesis block och kan jämföra sina kedjor när P2P byggs.
 Ändrar någon data i ett gammalt block räcker det inte att räkna om just det
 blockets hash, eftersom nästa block fortfarande pekar på den gamla hashen.
 
+### Känd begränsning: kedjans sista block
+
+Skyddet mot en omräknad hash kommer från nästa blocks `previousHash`. Sista
+blocket har ingen efterföljare, och kan därför ändras med omräknad hash eller
+tas bort helt utan att `isChainValid()` slår till.
+
+Det är inte en bugg som går att koda bort inne i den här klassen. En hashkedja
+kan inte förankra sitt eget slut på egen hand. Det löses av signering, som
+knyter varje block till en nyckel, och av P2P-synkronisering, där en annan nod
+har en längre kedja och avslöjar den som saknar block. Båda är kommande arbete.
+
+Begränsningen har ett eget test, `KÄND BEGRÄNSNING: sista blocket är ännu inte
+skyddat mot omräknad hash`, så att den syns i testkörningen och så att testet
+faller när skyddet väl byggs.
+
 Genesis behöver två kontroller, inte en. Den som ändrar innehållet men låter
 den gamla hashen ligga kvar fångas av hash-omräkningen. Den som byter ut hela
 blocket och räknar om hashen fångas av jämförelsen mot det kanoniska
@@ -123,7 +148,7 @@ Från `server/`:
 
     node --test
 
-17 tester ska passera.
+24 tester ska passera.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
 rapporterar den varianten "pass 1" och returnerar 0 även när ett test faktiskt
@@ -139,9 +164,10 @@ Från `server/`:
 
     node src/blockchain/demo.js
 
-Demon bygger en kedja med tre access logs, visar hasharna, försöker lägga in
-journaltext och avvisas, och ändrar sedan ett gammalt block så att valideringen
-slår till.
+Demon bygger en kedja med tre access logs och visar hasharna. Sedan görs två
+försök att få in journaltext, ett rakt via `content` och ett där texten göms i
+`userId`, och båda avvisas. Till sist ändras ett gammalt block så att
+valideringen slår till.
 
 ## Implementerat
 
@@ -149,9 +175,9 @@ slår till.
 - SHA-256 med deterministisk serialisering
 - Deterministiskt genesis block
 - Nya block länkade via previousHash
-- `isChainValid()`
+- `isChainValid()`, inklusive kontroll av genesis-blockets innehåll
 - Audit-format enligt `docs/api-contract.md`
-- Skydd som avvisar journaltext och okända fält
+- Skydd som avvisar okända fält, journaltext och fritext i tillåtna fält
 - `createAuditLog()` som gränssnitt mot backend
 - Automatiska tester och demonstrationsscript
 
@@ -167,3 +193,4 @@ Detta är kommande arbete och finns alltså inte i koden:
 - Fork-hantering och longest-chain rule
 - Inkoppling mot backendens AuditLogger
 - Persistens; kedjan ligger i minnet och försvinner när servern stoppas
+- Skydd av kedjans sista block, se den kända begränsningen ovan

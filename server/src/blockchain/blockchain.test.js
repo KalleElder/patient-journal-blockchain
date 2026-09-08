@@ -4,6 +4,7 @@ const assert = require('node:assert');
 const Block = require('./Block');
 const Blockchain = require('./Blockchain');
 const { buildAuditData } = require('./auditLog');
+const { sha256 } = require('./hash');
 
 // Fryst så att ett test inte kan påverka nästa genom att ändra i objektet.
 const auditEvent = Object.freeze({
@@ -26,6 +27,17 @@ test('en ny blockkedja skapas med ett genesis block', () => {
 
 test('genesis block blir identiskt på två noder', () => {
   assert.strictEqual(new Blockchain().chain[0].hash, new Blockchain().chain[0].hash);
+});
+
+// Att jämföra två nyskapade kedjor räcker inte som bevis för determinism. Även
+// ett genesis-block byggt på Date.now() hamnar oftast i samma millisekund och
+// skulle se deterministiskt ut. Det fasta värdet fångar dessutom oavsiktliga
+// ändringar i hashningen, vilket noderna är beroende av i P2P-steget.
+test('genesis block har den kanoniska hashen', () => {
+  assert.strictEqual(
+    new Blockchain().chain[0].hash,
+    'af70c9247a30a3fec0bd007557b1d597823e7fe09ba547000af73ed4fe2023f6',
+  );
 });
 
 // TEST 2
@@ -154,6 +166,51 @@ test('audit-data med saknade fält avvisas', () => {
 
 test('audit-data med okänd roll avvisas', () => {
   assert.throws(() => buildAuditData({ ...auditEvent, role: 'ADMIN' }), /Okänd roll/);
+});
+
+// Det räcker inte att kontrollera fältnamnen. Journaltext skulle annars kunna
+// smugglas in i ett fält som heter rätt.
+test('journaltext i ett tillåtet fält avvisas', () => {
+  assert.throws(
+    () => buildAuditData({ ...auditEvent, userId: 'Patienten har diabetes typ 2' }),
+    /heltal/,
+  );
+});
+
+test('fritext i action avvisas', () => {
+  assert.throws(
+    () => buildAuditData({ ...auditEvent, action: 'Läste journalen om diabetes' }),
+    /versaler/,
+  );
+});
+
+test('null i stället för värde avvisas', () => {
+  assert.throws(() => buildAuditData({ ...auditEvent, patientId: null }), /heltal/);
+});
+
+test('ogiltig timestamp avvisas', () => {
+  assert.throws(() => buildAuditData({ ...auditEvent, timestamp: 'i går' }), /tidsstämpel/);
+});
+
+test('två olika datum ger olika hash', () => {
+  assert.notStrictEqual(sha256(new Date('2020-01-01')), sha256(new Date('2025-06-06')));
+});
+
+// Känd begränsning, inte en bugg som ska "rättas" genom att ändra testet.
+// En hashkedja kan inte skydda sitt eget sista block, eftersom skyddet mot en
+// omräknad hash kommer från nästa blocks previousHash. Sista blocket har ingen
+// efterföljare. Det löses av signering och P2P-synkronisering, som är kommande
+// arbete. Testet finns för att begränsningen ska vara synlig och för att falla
+// när skyddet väl byggs.
+test('KÄND BEGRÄNSNING: sista blocket är ännu inte skyddat mot omräknad hash', () => {
+  const blockchain = new Blockchain();
+  blockchain.addBlock(auditEvent);
+
+  const last = blockchain.getLatestBlock();
+  last.data.patientId = 8;
+  last.hash = last.calculateHash();
+
+  assert.strictEqual(blockchain.isChainValid(), true);
 });
 
 test('samma innehåll ger samma hash oavsett nyckelordning', () => {

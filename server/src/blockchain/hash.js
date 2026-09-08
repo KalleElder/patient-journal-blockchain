@@ -9,6 +9,13 @@ function stableStringify(value) {
     return JSON.stringify(value);
   }
 
+  // Ett Date-objekt har inga egna nycklar, så den generella objektgrenen nedan
+  // skulle göra varje datum till "{}". Två olika tidpunkter hade då fått samma
+  // hash, och en ändrad tidsstämpel hade inte upptäckts av valideringen.
+  if (value instanceof Date) {
+    return JSON.stringify(value.toISOString());
+  }
+
   if (Array.isArray(value)) {
     return `[${value.map(stableStringify).join(',')}]`;
   }

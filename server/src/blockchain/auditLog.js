@@ -31,8 +31,23 @@ function buildAuditData(event) {
     throw new Error(`Okänd roll: ${event.role}. Tillåtna roller: ${KNOWN_ROLES.join(', ')}`);
   }
 
-  if (typeof event.action !== 'string' || event.action.trim() === '') {
-    throw new Error('Audit-data måste ha en action, exempelvis READ_JOURNAL');
+  // Det räcker inte att kontrollera fältnamnen. Utan kontroll av innehållet
+  // skulle journaltext kunna smugglas in i ett tillåtet fält, exempelvis
+  // userId: 'Patienten har diabetes typ 2'. Varje fält är därför låst till
+  // den form det faktiskt ska ha.
+  if (!Number.isInteger(event.userId) || !Number.isInteger(event.patientId)) {
+    throw new Error('userId och patientId måste vara heltal');
+  }
+
+  // Actions är konstanter i versaler, exempelvis READ_JOURNAL. Formen
+  // kontrolleras i stället för en fast lista, eftersom api-contract.md och
+  // roles-and-permissions.md ännu listar olika actions.
+  if (typeof event.action !== 'string' || !/^[A-Z][A-Z_]*$/.test(event.action)) {
+    throw new Error('action måste vara en konstant i versaler, exempelvis READ_JOURNAL');
+  }
+
+  if (typeof event.timestamp !== 'string' || Number.isNaN(Date.parse(event.timestamp))) {
+    throw new Error('timestamp måste vara en tidsstämpel som sträng, exempelvis ISO 8601');
   }
 
   return {
