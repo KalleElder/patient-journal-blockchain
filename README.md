@@ -314,6 +314,32 @@ Följande finns på main:
 
 Mer information finns i `client/README.md`.
 
+### Blockchain för access logs
+
+Tim har implementerat blockchain-grunden i `server/src/blockchain/`.
+
+Följande finns på main:
+
+- `Block` och `Blockchain`
+- SHA-256-hashning med deterministisk serialisering
+- deterministiskt genesis block
+- nya block länkade via `previousHash`
+- `isChainValid()` som upptäcker ändrade, utbytta och ombytta block
+- audit-format enligt `docs/api-contract.md`
+- kontroll som avvisar journaltext, okända fält och fritext i tillåtna fält
+- `createAuditLog()` som gränssnitt mot backendens kommande AuditLogger
+- automatiska tester och ett demonstrationsscript
+
+Blockkedjan är fristående och ännu inte inkopplad i någon route. Den ligger i
+minnet och sparas inte mellan omstarter.
+
+Kedjans sista block är ännu inte skyddat mot en omräknad hash, eftersom en
+hashkedja inte kan förankra sitt eget slut. Det löses av signering och
+P2P-synkronisering. Begränsningen är dokumenterad och testad, se
+`server/src/blockchain/README.md`.
+
+Mer information finns i `server/src/blockchain/README.md`.
+
 ### Inte implementerat ännu
 
 Följande delar återstår eller är planerade för kommande iterationer:
@@ -321,8 +347,9 @@ Följande delar återstår eller är planerade för kommande iterationer:
 - SQL-integration
 - patient-API
 - journal-API
-- blockchain för access logs
-- P2P-synkronisering
+- inkoppling av blockchain mot backendens AuditLogger
+- digital signering och Merkle Tree
+- P2P-synkronisering och fork-hantering
 - patientsökning, journalvy och access logs i frontend
 - Socket.io-integration
 - slutlig end-to-end-integration
