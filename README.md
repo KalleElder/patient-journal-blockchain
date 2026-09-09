@@ -340,6 +340,34 @@ P2P-synkronisering. Begränsningen är dokumenterad och testad, se
 
 Mer information finns i `server/src/blockchain/README.md`.
 
+### P2P mellan noder
+
+Tim har implementerat synkronisering mellan noder i `server/src/p2p/`.
+
+Följande finns på branchen `feature/p2p`:
+
+- `replaceChain()` som byter ut den lokala kedjan endast om den mottagna är
+  giltig och längre
+- återskapning av mottagna block till riktiga `Block`-objekt, med behållen hash
+- Socket.io-server och klient i varje nod, med händelserna `REQUEST_CHAIN`,
+  `CHAIN` och `NEW_BLOCK`
+- utbyte av kedjor när noderna ansluter, åt båda hållen
+- broadcast när noden själv skapar ett audit-block
+- kontroll av att endast audit-data kommer in över nätet, även när hasharna
+  stämmer
+- loggar per nod, automatiska tester över riktiga sockets och ett
+  demonstrationsscript
+
+Två noder startas i varsin terminal från `server/`:
+
+    PORT=3001 PEER_URL=http://localhost:3002 npm start
+    PORT=3002 PEER_URL=http://localhost:3001 npm start
+
+Kedjor med exakt samma längd hanteras inte ännu. Där behåller varje nod sin
+egen kedja tills fork-hanteringen byggs.
+
+Mer information finns i `server/src/p2p/README.md`.
+
 ### Inte implementerat ännu
 
 Följande delar återstår eller är planerade för kommande iterationer:
@@ -349,9 +377,9 @@ Följande delar återstår eller är planerade för kommande iterationer:
 - journal-API
 - inkoppling av blockchain mot backendens AuditLogger
 - digital signering och Merkle Tree
-- P2P-synkronisering och fork-hantering
+- fork-hantering när två noder har kedjor av exakt samma längd
 - patientsökning, journalvy och access logs i frontend
-- Socket.io-integration
+- Socket.io mot frontend för liveuppdateringar
 - slutlig end-to-end-integration
 
 Medicinsk journaldata ska lagras i SQL och ska inte lagras i blockchain.
