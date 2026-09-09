@@ -29,8 +29,8 @@ async function startaNod(t, { peerUrls = [], antalBlock = 0, loggar } = {}) {
   }
 
   // Port 0 betyder att operativsystemet väljer en ledig port. Med fasta
-  // portnummer failar testerna sporadiskt, eftersom en port från förra
-  // körningen kan ligga kvar i TIME_WAIT.
+  // portnummer failar testerna så fort porten råkar vara upptagen, till
+  // exempel av en nod från en avbruten körning som aldrig hann städas undan.
   const httpServer = http.createServer();
   await new Promise((resolve) => { httpServer.listen(0, resolve); });
   const port = httpServer.address().port;
