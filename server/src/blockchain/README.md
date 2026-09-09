@@ -21,7 +21,13 @@ som heter rätt, exempelvis `userId: 'Patienten har diabetes typ 2'`. Därför
 kontrolleras även innehållet: `userId` och `patientId` måste vara heltal,
 `action` måste vara en konstant i versaler som `READ_JOURNAL`, `timestamp` måste
 vara en tidsstämpel som sträng, och `role` måste vara en av de fem rollerna.
-Det finns inget fält kvar där fritext får plats.
+Strängfälten har dessutom ett tak på 64 tecken, så ingen kan bära text i dem
+genom att bara skriva den i versaler. Det finns inget fält kvar där fritext får
+plats.
+
+Formkontrollen av `action` byts mot en lista av tillåtna värden när
+`docs/api-contract.md` och `docs/roles-and-permissions.md` är synkade. Kalle
+har bett mig stämma av dem med Yamfu inför integrationen.
 
 Den som anropar `Blockchain.addBlock()` direkt går förbi kontrollen. Backend ska
 därför alltid gå via `createAuditLog()`.
@@ -37,6 +43,9 @@ därför alltid gå via `createAuditLog()`.
 | `index.js` | Modulens utsida, bland annat `createAuditLog()` |
 | `demo.js` | Demonstrationsscript |
 | `blockchain.test.js` | Automatiska tester |
+| `sync.test.js` | Tester för synk mellan noder, utan nätverk |
+
+Själva nätverket ligger i `server/src/p2p/`, se `server/src/p2p/README.md`.
 
 ## Block
 
@@ -107,9 +116,12 @@ blocket har ingen efterföljare, och kan därför ändras med omräknad hash ell
 tas bort helt utan att `isChainValid()` slår till.
 
 Det är inte en bugg som går att koda bort inne i den här klassen. En hashkedja
-kan inte förankra sitt eget slut på egen hand. Det löses av signering, som
-knyter varje block till en nyckel, och av P2P-synkronisering, där en annan nod
-har en längre kedja och avslöjar den som saknar block. Båda är kommande arbete.
+kan inte förankra sitt eget slut på egen hand.
+
+P2P-synken mildrar det numera: en nod som tappat sitt sista block har en
+kortare kedja än grannen och får den ersatt vid nästa synk. Ändras sista
+blocket med omräknad hash utan att längden ändras upptäcks det dock inte, och
+det löses först av signering som knyter varje block till en nyckel.
 
 Begränsningen har ett eget test, `KÄND BEGRÄNSNING: sista blocket är ännu inte
 skyddat mot omräknad hash`, så att den syns i testkörningen och så att testet
@@ -120,6 +132,23 @@ den gamla hashen ligga kvar fångas av hash-omräkningen. Den som byter ut hela
 blocket och räknar om hashen fångas av jämförelsen mot det kanoniska
 genesis-blocket. Ingen av kontrollerna räcker ensam, eftersom genesis inte har
 något föregående block som kan avslöja en ändring.
+
+## Synk mellan noder
+
+`replaceChain(receivedChain)` tar emot en kedja från en annan nod och ersätter
+den lokala bara om den inkommande är **giltig och längre**. Kedjan återskapas
+först till riktiga `Block`-objekt med `Blockchain.fromJSON()`, eftersom en
+kedja som kommit via JSON bara innehåller vanliga objekt utan metoder.
+
+`Block.fromJSON()` behåller den medskickade hashen i stället för att räkna om
+den. Räknade den om hashen skulle varje manipulerat block bli giltigt i samma
+stund som det togs emot.
+
+`addReceivedBlock(plainBlock)` lägger till ett enskilt block från en annan nod,
+men bara om det passar direkt ovanpå kedjans sista block.
+
+Kedjor med exakt samma längd hanteras inte. Där behålls den lokala kedjan tills
+fork-hanteringen byggs.
 
 ## Gränssnitt mot backend
 
@@ -148,7 +177,7 @@ Från `server/`:
 
     node --test
 
-24 tester ska passera.
+54 tester ska passera, inklusive P2P-testerna i `server/src/p2p/`.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
 rapporterar den varianten "pass 1" och returnerar 0 även när ett test faktiskt
@@ -179,18 +208,17 @@ valideringen slår till.
 - Audit-format enligt `docs/api-contract.md`
 - Skydd som avvisar okända fält, journaltext och fritext i tillåtna fält
 - `createAuditLog()` som gränssnitt mot backend
+- `replaceChain()`, `fromJSON()` och `addReceivedBlock()` för synk mellan noder
 - Automatiska tester och demonstrationsscript
 
 ## Inte implementerat ännu
 
 Detta är kommande arbete och finns alltså inte i koden:
 
-- P2P mellan node 3001 och 3002
-- Socket.io
 - Public/private key-signering
 - Verifiering av digitala signaturer
 - Merkle Tree
-- Fork-hantering och longest-chain rule
+- Fork-hantering när två kedjor har exakt samma längd
 - Inkoppling mot backendens AuditLogger
 - Persistens; kedjan ligger i minnet och försvinner när servern stoppas
 - Skydd av kedjans sista block, se den kända begränsningen ovan
