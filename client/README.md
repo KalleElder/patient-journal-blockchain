@@ -94,7 +94,7 @@ Manuellt testat mot Yamfus backend (main):
 - frontend startar och login-sidan visas
 - `doctor1` + rätt lösenord loggar in och visar "Roll: DOCTOR"
 - fel lösenord ger "Felaktiga inloggningsuppgifter."
-- `patient1` loggar in, visar "Roll: PATIENT" och patient-ID 7
+- `patient1` loggar in, visar "Roll: PATIENT" och sitt patient-ID
 - refresh behåller inloggningen via `GET /api/auth/me`
 - logga ut rensar sessionen och visar login-sidan
 - `npm run install:all` från projektroten installerar både server och client
