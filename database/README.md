@@ -13,18 +13,22 @@ medicinska journaluppgifter.
 
 Medicinsk journaltext ska lagras i SQL-databasen och aldrig i blockchain.
 
-## Planerade filer
+## Filer
 
-Databasmappen kommer senare att innehålla exempelvis:
+Databasmappen innehåller:
 
     database/
     ├── schema.sql
     └── seed.sql
 
-schema.sql ska innehålla SQL-kommandon för att skapa databasen och
+schema.sql innehåller SQL-kommandon för att skapa databasen och
 tabellerna.
 
-seed.sql kan användas för testdata under utvecklingen.
+seed.sql används för testdata under utvecklingen.
+
+Kör `npm run db:init` för att köra båda filerna mot en ny lokal SQLite-fil.
+Databasteknik är SQLite; sökvägen styrs av `DB_PATH` i `.env`, se
+`server/README.md`.
 
 ## Planerade tabeller
 
@@ -53,6 +57,10 @@ Exempel på information:
 - patientinformation
 - koppling till användare om patienten har ett eget konto
 
+Relationen går i praktiken åt andra hållet: `users.patient_id` pekar på
+`patients.id`, inte tvärtom. Det räcker för att koppla en PATIENT-användare
+till sin patient utan att patients behöver en egen koppling till users.
+
 ### journal_entries
 
 Medicinska journalanteckningar.
@@ -66,7 +74,7 @@ Exempel på information:
 - visibility
 - created_at
 
-Den exakta strukturen bestäms när backend och databasen implementeras.
+Tabellen finns i schemat men fylls inte i av denna PR.
 
 ## Roller
 
@@ -131,9 +139,8 @@ Lokala inställningar ska senare läggas i .env.
 
 ## Status
 
-SQL-databasen är ännu inte implementerad.
+Schema och seed finns i schema.sql och seed.sql. `/api/auth/login` och
+`/api/auth/me` läser nu från SQLite istället för en hårdkodad lista.
 
-Yamfu skapar den faktiska databasstrukturen när backend-arbetet
-påbörjas.
-
-Den slutliga databasstrukturen dokumenteras här och i schema.sql.
+Patient-API, journal-API och auditLogger/blockchain-integration är inte
+implementerade ännu.

@@ -178,9 +178,9 @@ SQL och blockchain innan mer avancerade funktioner byggs.
 ## Implementerat i första auth-versionen
 
 Avsnitten ovan bevarar projektets ursprungliga plan och status före denna PR.
-Nu finns Express-grunden och authentication enligt nedan. SQL-integration
-kommer i en senare PR; övrig planerad funktionalitet ovan är inte implementerad
-av denna auth-PR.
+Nu finns Express-grunden, authentication och SQLite-databasen enligt nedan.
+Övrig planerad funktionalitet ovan (patient-/journal-API, auditLogger,
+blockchain-integration) är inte implementerad ännu.
 
 ### Installation och start
 
@@ -196,6 +196,12 @@ Ange ett eget lokalt `JWT_SECRET` i projektrotens `.env`. Variabeln är
 obligatorisk; servern stoppar om den saknas. Committa aldrig `.env` eller
 `node_modules/`. Servern läser rotens `.env` oavsett arbetskatalog.
 `PORT` använder 3001 om den saknas.
+
+Kör `npm run db:init` (från projektroten) eller `npm run db:init --prefix
+server` för att skapa SQLite-databasen med tabeller och testdata. Detta
+skapar om databasfilen från grunden varje gång. `DB_PATH` i `.env` styr var
+filen hamnar, relativt projektroten; standard är `database/patient_journal.db`.
+Databasfilen committas aldrig (se `.gitignore`).
 
 Starta från projektroten med `npm run start:server`, eller från `server/`
 med `npm start`. För utveckling finns `npm run dev` i `server/`.
@@ -227,6 +233,7 @@ JWT gäller i en timme. Lösenord och `passwordHash` returneras aldrig.
 ### Tillfälliga syntetiska användare
 
 `doctor1` (DOCTOR), `nurse1` (NURSE), `carecenter1` (CARE_CENTER) och
-`patient1` (PATIENT, `patientId: 7`) använder testlösenordet `password123`.
-Endast bcrypt-hashar lagras i `src/data/users.js`. Kontona är för lokal testning.
+`patient1` (PATIENT) använder testlösenordet `password123`. Kontona läggs in
+av `database/seed.sql` när `npm run db:init` körs. Endast bcrypt-hashar
+lagras, i SQLite-tabellen `users`. Kontona är för lokal testning.
 UNAUTHORIZED beskriver ett obehörigt tillstånd och har inget testkonto.

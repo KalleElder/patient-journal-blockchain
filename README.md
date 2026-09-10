@@ -284,7 +284,9 @@ Följande finns på main:
 - JWT-baserad authentication
 - auth middleware
 - skyddad `GET /api/auth/me`
-- testanvändare för rollerna `DOCTOR`, `NURSE`, `CARE_CENTER` och `PATIENT`
+- SQLite-databas (`database/schema.sql`, `database/seed.sql`, `npm run db:init`)
+- testanvändare för rollerna `DOCTOR`, `NURSE`, `CARE_CENTER` och `PATIENT`,
+  lagrade i SQLite
 
 Authentication har efter merge verifierats från main genom manuella
 integrationstester.
@@ -372,7 +374,6 @@ Mer information finns i `server/src/p2p/README.md`.
 
 Följande delar återstår eller är planerade för kommande iterationer:
 
-- SQL-integration
 - patient-API
 - journal-API
 - inkoppling av blockchain mot backendens AuditLogger
