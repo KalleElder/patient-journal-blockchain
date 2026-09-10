@@ -1,5 +1,6 @@
 const express = require('express');
 const authRoutes = require('./routes/auth.routes');
+const patientRoutes = require('./routes/patient.routes');
 
 const app = express();
 app.use(express.json());
@@ -8,6 +9,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'patient-journal-backend' });
 });
 app.use('/api/auth', authRoutes);
+app.use('/api/patients', patientRoutes);
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
