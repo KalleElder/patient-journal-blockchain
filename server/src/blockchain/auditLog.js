@@ -4,6 +4,10 @@ const ALLOWED_FIELDS = ['userId', 'patientId', 'role', 'action', 'timestamp'];
 
 const KNOWN_ROLES = ['DOCTOR', 'NURSE', 'CARE_CENTER', 'PATIENT', 'UNAUTHORIZED'];
 
+// Ingen av strängarna i ett audit-event är lång. Taket gör att ett fält inte
+// kan användas för att bära mer text än det är tänkt för.
+const MAX_TEXTLÄNGD = 64;
+
 // Blockkedjan får aldrig innehålla medicinsk journaltext. I stället för att
 // lita på att varje anropande route kommer ihåg det avvisas allt som inte är
 // ett av de tillåtna metadatafälten. Skickar någon med content, diagnos eller
@@ -42,11 +46,17 @@ function buildAuditData(event) {
   // Actions är konstanter i versaler, exempelvis READ_JOURNAL. Formen
   // kontrolleras i stället för en fast lista, eftersom api-contract.md och
   // roles-and-permissions.md ännu listar olika actions.
-  if (typeof event.action !== 'string' || !/^[A-Z][A-Z_]*$/.test(event.action)) {
+  // Längden begränsas eftersom formkontrollen ensam inte hindrar att någon
+  // skickar en väldigt lång sträng i versaler. En riktig action är kort.
+  if (typeof event.action !== 'string'
+    || event.action.length > MAX_TEXTLÄNGD
+    || !/^[A-Z][A-Z_]*$/.test(event.action)) {
     throw new Error('action måste vara en konstant i versaler, exempelvis READ_JOURNAL');
   }
 
-  if (typeof event.timestamp !== 'string' || Number.isNaN(Date.parse(event.timestamp))) {
+  if (typeof event.timestamp !== 'string'
+    || event.timestamp.length > MAX_TEXTLÄNGD
+    || Number.isNaN(Date.parse(event.timestamp))) {
     throw new Error('timestamp måste vara en tidsstämpel som sträng, exempelvis ISO 8601');
   }
 
@@ -59,4 +69,19 @@ function buildAuditData(event) {
   };
 }
 
-module.exports = { buildAuditData, ALLOWED_FIELDS, KNOWN_ROLES };
+// Samma regler som buildAuditData, men som ja eller nej i stället för ett
+// undantag. Används på block som kommit från en annan nod. Att en kedja
+// hashar korrekt säger bara att ingen ändrat i den efteråt, inte att
+// innehållet är sådant vi får spara.
+function isAuditData(data) {
+  try {
+    buildAuditData(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+module.exports = {
+  buildAuditData, isAuditData, ALLOWED_FIELDS, KNOWN_ROLES,
+};

@@ -206,6 +206,17 @@ Databasfilen committas aldrig (se `.gitignore`).
 Starta från projektroten med `npm run start:server`, eller från `server/`
 med `npm start`. För utveckling finns `npm run dev` i `server/`.
 
+Servern kör som en nod i P2P-nätverket. `PORT` styr vilken port noden lyssnar
+på och `PEER_URL` vilka grannar den ansluter till. Lämnas `PEER_URL` tom kör
+noden ensam. Två noder startas i varsin terminal från `server/`:
+
+```powershell
+$env:PORT=3001; $env:PEER_URL="http://localhost:3002"; npm start
+$env:PORT=3002; $env:PEER_URL="http://localhost:3001"; npm start
+```
+
+Se `server/src/p2p/README.md` för hur synkroniseringen fungerar.
+
 ### Tillgängliga routes
 
 - `GET /api/health`: publik, returnerar 200 med
