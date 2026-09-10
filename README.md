@@ -346,7 +346,7 @@ Mer information finns i `server/src/blockchain/README.md`.
 
 Tim har implementerat synkronisering mellan noder i `server/src/p2p/`.
 
-Följande finns på branchen `feature/p2p`:
+Följande är implementerat:
 
 - `replaceChain()` som byter ut den lokala kedjan endast om den mottagna är
   giltig och längre
