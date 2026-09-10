@@ -346,7 +346,7 @@ Mer information finns i `server/src/blockchain/README.md`.
 
 Tim har implementerat synkronisering mellan noder i `server/src/p2p/`.
 
-Följande finns på branchen `feature/p2p`:
+Följande är implementerat på main:
 
 - `replaceChain()` som byter ut den lokala kedjan endast om den mottagna är
   giltig och längre
@@ -369,6 +369,14 @@ Kedjor med exakt samma längd hanteras inte ännu. Där behåller varje nod sin
 egen kedja tills fork-hanteringen byggs.
 
 Mer information finns i `server/src/p2p/README.md`.
+
+### Server-tester
+
+Serverns automatiska tester kan köras från projektroten med:
+
+    npm run test:server
+
+Efter integration av blockchain, P2P och SQLite passerar 54 servertester.
 
 ### Inte implementerat ännu
 
