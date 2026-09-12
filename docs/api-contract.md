@@ -34,34 +34,48 @@ Planerad response:
 
 ## Patients
 
+Kräver `Authorization: Bearer <token>` (se Authentication). Saknad eller
+ogiltig token ger 401.
+
 ### GET /api/patients
 
-Returnerar patienter som den inloggade användaren har behörighet att se
-eller söka efter.
+Vårdpersonal (`DOCTOR`/`NURSE`/`CARE_CENTER`) får en lista patienter (200).
+`PATIENT` nekas (403).
 
-Backend ansvarar alltid för behörighetskontrollen.
+Response:
+
+    [
+      { "id": 1, "name": "Anna Andersson" }
+    ]
 
 ### GET /api/patients/:id
 
-Returnerar information om en specifik patient om användaren har behörighet.
+Vårdpersonal får patienten (200) eller 404 om den saknas.
+
+`PATIENT` får sin egen patient (200/404). Ett annat `:id` ger 403, oavsett
+om patienten finns eller inte.
 
 Exempel:
 
-    GET /api/patients/7
+    GET /api/patients/1
 
 ## Journal
 
 ### GET /api/patients/:id/journal
 
 Returnerar de journalanteckningar som den inloggade användaren har
-behörighet att läsa.
+behörighet att läsa. Samma behörighet som `GET /api/patients/:id`, plus:
 
-Exempel på planerad response:
+Vårdpersonal ser poster med `visibility: "STAFF"` och `"ALL"`, samt egna
+poster med `visibility: "PRIVATE"`. `PATIENT` ser endast `"ALL"`-poster
+för sin egen patient.
+
+Response:
 
     [
       {
         "id": 1,
-        "patientId": 7,
+        "patientId": 1,
         "authorId": 3,
         "authorName": "Dr Anna",
         "content": "Exempel på journalanteckning",
@@ -72,31 +86,26 @@ Exempel på planerad response:
 
 ### POST /api/patients/:id/journal
 
-Skapar en ny journalanteckning.
+Skapar en ny journalanteckning. Endast vårdpersonal (403 för `PATIENT`).
 
-Exempel på request:
+Request:
 
     {
       "content": "Patienten mår bättre.",
       "visibility": "STAFF"
     }
 
-Planerade visibility-värden:
+`patientId` tas endast från URL:en, `authorId` endast från den
+inloggade användaren (aldrig från body). Tomt/whitespace-`content` eller
+ogiltig `visibility` ger 400. Okänd patient ger 404. Lyckad post ger 201
+med samma format som en post i `GET .../journal`.
 
-- PRIVATE
-- STAFF
-- ALL
+Visibility-värden:
 
-PRIVATE betyder att anteckningen endast kan läsas enligt projektets
-privata behörighetsregel.
-
-STAFF betyder att behörig sjukvårdspersonal kan läsa anteckningen.
-
-ALL betyder att behörig sjukvårdspersonal och patienten kan läsa
-anteckningen.
-
-Den exakta behörighetsmodellen bestäms tillsammans innan implementationen
-låses.
+- PRIVATE — endast skaparen (`authorId`) kan läsa anteckningen.
+- STAFF — vårdpersonal kan läsa anteckningen, `PATIENT` kan inte.
+- ALL — vårdpersonal och den anteckningen gäller (rätt `PATIENT`) kan läsa
+  anteckningen.
 
 ## Access Logs
 
