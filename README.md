@@ -376,7 +376,11 @@ Serverns automatiska tester kan köras från projektroten med:
 
     npm run test:server
 
-Efter integration av blockchain, P2P och SQLite passerar 54 servertester.
+Integrationen har verifierats lokalt efter merge av blockchain, P2P och SQLite.
+
+Vid Kalles integrationstest passerade samtliga 54 servertester. Ett
+miljö-/Node-relaterat fel i testet för djupt kapslad P2P-data har observerats
+på en annan utvecklingsmiljö och undersöks separat.
 
 ### Inte implementerat ännu
 
