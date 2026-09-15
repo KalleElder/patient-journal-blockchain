@@ -74,7 +74,7 @@ Exempel på information:
 - visibility
 - created_at
 
-Tabellen finns i schemat men fylls inte i av denna PR.
+Används av patient/journal-API:t (`GET`/`POST /api/patients/:id/journal`).
 
 ## Roller
 
@@ -142,5 +142,6 @@ Lokala inställningar ska senare läggas i .env.
 Schema och seed finns i schema.sql och seed.sql. `/api/auth/login` och
 `/api/auth/me` läser nu från SQLite istället för en hårdkodad lista.
 
-Patient-API, journal-API och auditLogger/blockchain-integration är inte
-implementerade ännu.
+Patient-API (`GET/POST /api/patients/...`) läser och skriver mot `patients`
+och `journal_entries`. AuditLogger/blockchain-integration är inte
+implementerad ännu.

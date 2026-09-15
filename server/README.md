@@ -227,6 +227,21 @@ Se `server/src/p2p/README.md` för hur synkroniseringen fungerar.
 - `GET /api/auth/me`: kräver `Authorization: Bearer <token>` och returnerar
   verifierad `user` med `userId`, `role` och eventuellt `patientId`.
   Saknad eller ogiltig token ger 401.
+- `GET /api/patients`: kräver token. `DOCTOR`/`NURSE`/`CARE_CENTER` får en
+  lista patienter (200). `PATIENT` nekas (403).
+- `GET /api/patients/:id`: kräver token. Vårdpersonal får patienten (200)
+  eller 404 om den saknas. `PATIENT` får sin egen patient (200/404), men
+  403 på ett annat `:id`.
+- `GET /api/patients/:id/journal`: kräver token, samma behörighet som ovan
+  plus 404 för okänd patient. Vårdpersonal ser `STAFF`- och `ALL`-poster,
+  samt egna `PRIVATE`-poster. `PATIENT` ser endast `ALL`-poster för sin
+  egen patient.
+- `POST /api/patients/:id/journal`: kräver token och vårdpersonal-roll
+  (403 för `PATIENT`). Body: `{ "content": "...", "visibility": "PRIVATE" | "STAFF" | "ALL" }`.
+  Tomt/whitespace-`content` eller ogiltig `visibility` ger 400, okänd
+  patient ger 404. Lyckad post ger 201 med `id`, `patientId`, `authorId`,
+  `authorName`, `content`, `visibility`, `createdAt`. `patientId` tas
+  endast från URL:en, `authorId` endast från den inloggade användaren.
 
 JWT gäller i en timme. Lösenord och `passwordHash` returneras aldrig.
 
