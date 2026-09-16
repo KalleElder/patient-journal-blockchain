@@ -104,6 +104,11 @@ test('patient får 403 om den försöker läsa annan patient via URL', async () 
   assert.strictEqual(res.status, 403);
 });
 
+test('patient får 403 om den försöker läsa annan patients journal via URL', async () => {
+  const res = await call('/api/patients/2/journal', { tok: patientToken() });
+  assert.strictEqual(res.status, 403);
+});
+
 test('okänd patient ger 404', async () => {
   const res = await call('/api/patients/999', { tok: doctorToken() });
   assert.strictEqual(res.status, 404);
