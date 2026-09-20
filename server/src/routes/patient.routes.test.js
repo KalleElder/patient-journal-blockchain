@@ -286,7 +286,7 @@ test('journaltext hamnar inte i blockchain vid skapande av journalanteckning', a
   );
 });
 
-test('nekad journalskapning skapar inget lyckat audit-block', async () => {
+test('nekad journalskapning skapar ACCESS_DENIED i blockchain', async () => {
   const chain = getAuditChain();
   const beforeLength = chain.chain.length;
 
@@ -300,5 +300,33 @@ test('nekad journalskapning skapar inget lyckat audit-block', async () => {
   });
 
   assert.strictEqual(res.status, 403);
-  assert.strictEqual(chain.chain.length, beforeLength);
+  assert.strictEqual(chain.chain.length, beforeLength + 1);
+
+  const block = chain.getLatestBlock();
+
+  assert.strictEqual(block.data.userId, 3);
+  assert.strictEqual(block.data.patientId, 1);
+  assert.strictEqual(block.data.role, 'PATIENT');
+  assert.strictEqual(block.data.action, 'ACCESS_DENIED');
+  assert.strictEqual(block.data.content, undefined);
+});
+
+test('försök att läsa annan patients journal skapar ACCESS_DENIED i blockchain', async () => {
+  const chain = getAuditChain();
+  const beforeLength = chain.chain.length;
+
+  const res = await call('/api/patients/2/journal', {
+    tok: patientToken(),
+  });
+
+  assert.strictEqual(res.status, 403);
+  assert.strictEqual(chain.chain.length, beforeLength + 1);
+
+  const block = chain.getLatestBlock();
+
+  assert.strictEqual(block.data.userId, 3);
+  assert.strictEqual(block.data.patientId, 2);
+  assert.strictEqual(block.data.role, 'PATIENT');
+  assert.strictEqual(block.data.action, 'ACCESS_DENIED');
+  assert.ok(block.data.timestamp);
 });

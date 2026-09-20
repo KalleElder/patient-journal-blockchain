@@ -222,5 +222,10 @@ Blockchain-modulens `createAuditLog()` skapar audit-blocket. När servern körs
 med P2P skickas nya lokala audit-block vidare genom den befintliga
 P2P-anslutningen.
 
-`ACCESS_DENIED` är dokumenterad som planerad action men är ännu inte
-inkopplad i patient- och journal-API:t.
+`ACCESS_DENIED` skapas för autentiserade nekade journalförsök när:
+
+- en patient försöker läsa en annan patients journal
+- en patient försöker skapa en journalanteckning
+
+401-försök med saknad eller ogiltig token loggas inte i blockchain, eftersom
+det nuvarande audit-formatet kräver ett verifierat `userId` och `patientId`.

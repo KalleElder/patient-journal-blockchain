@@ -63,6 +63,13 @@ function getPatientJournal(req, res) {
   const { role, userId, patientId: ownPatientId } = req.user;
   if (role === 'PATIENT') {
     if (patientId !== ownPatientId) {
+      logAuditEvent({
+        userId,
+        patientId,
+        role,
+        action: 'ACCESS_DENIED',
+      });
+
       return res.status(403).json({ error: 'Åtkomst nekad' });
     }
   } else if (!STAFF_ROLES.includes(role)) {
@@ -113,6 +120,13 @@ function createJournalEntry(req, res) {
 
   const { role, userId } = req.user;
   if (!STAFF_ROLES.includes(role)) {
+    logAuditEvent({
+      userId,
+      patientId,
+      role,
+      action: 'ACCESS_DENIED',
+    });
+
     return res.status(403).json({ error: 'Åtkomst nekad' });
   }
 
