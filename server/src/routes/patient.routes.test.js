@@ -13,6 +13,7 @@ process.env.DB_PATH = path.join(os.tmpdir(), `patient-journal-test-${process.pid
 
 const db = require('../db');
 const app = require('../app');
+const { getAuditChain } = require('../blockchain');
 
 const schemaSql = fs.readFileSync(path.resolve(__dirname, '../../../database/schema.sql'), 'utf8');
 db.exec(schemaSql);
@@ -219,4 +220,118 @@ test('ALL syns för vårdpersonal och rätt patient', async () => {
 
   const asPatient = await (await call('/api/patients/1/journal', { tok: patientToken() })).json();
   assert.ok(asPatient.some((e) => e.content === 'ALL-anteckning för synlighetstest'));
+});
+
+test('journalläsning skapar READ_JOURNAL i blockchain', async () => {
+  const chain = getAuditChain();
+  const beforeLength = chain.chain.length;
+
+  const res = await call('/api/patients/1/journal', {
+    tok: doctorToken(),
+  });
+
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(chain.chain.length, beforeLength + 1);
+
+  const block = chain.getLatestBlock();
+
+  assert.strictEqual(block.data.userId, 1);
+  assert.strictEqual(block.data.patientId, 1);
+  assert.strictEqual(block.data.role, 'DOCTOR');
+  assert.strictEqual(block.data.action, 'READ_JOURNAL');
+  assert.ok(block.data.timestamp);
+});
+
+test('skapad journalanteckning skapar CREATE_JOURNAL_ENTRY i blockchain', async () => {
+  const chain = getAuditChain();
+  const beforeLength = chain.chain.length;
+
+  const res = await call('/api/patients/1/journal', {
+    method: 'POST',
+    tok: doctorToken(),
+    body: {
+      content: 'Audit integration test journaltext',
+      visibility: 'ALL',
+    },
+  });
+
+  assert.strictEqual(res.status, 201);
+  assert.strictEqual(chain.chain.length, beforeLength + 1);
+
+  const block = chain.getLatestBlock();
+
+  assert.strictEqual(block.data.userId, 1);
+  assert.strictEqual(block.data.patientId, 1);
+  assert.strictEqual(block.data.role, 'DOCTOR');
+  assert.strictEqual(block.data.action, 'CREATE_JOURNAL_ENTRY');
+  assert.ok(block.data.timestamp);
+});
+
+test('journaltext hamnar inte i blockchain vid skapande av journalanteckning', async () => {
+  const journaltext = 'HEMLIG JOURNALTEXT SOM INTE FÅR HAMNA I BLOCKCHAIN';
+
+  const res = await call('/api/patients/1/journal', {
+    method: 'POST',
+    tok: doctorToken(),
+    body: {
+      content: journaltext,
+      visibility: 'ALL',
+    },
+  });
+
+  assert.strictEqual(res.status, 201);
+
+  const block = getAuditChain().getLatestBlock();
+
+  assert.strictEqual(block.data.content, undefined);
+  assert.strictEqual(JSON.stringify(block.data).includes(journaltext), false);
+  assert.deepStrictEqual(
+    Object.keys(block.data).sort(),
+    ['action', 'patientId', 'role', 'timestamp', 'userId'],
+  );
+});
+
+test('nekad journalskapning skapar ACCESS_DENIED i blockchain', async () => {
+  const chain = getAuditChain();
+  const beforeLength = chain.chain.length;
+
+  const res = await call('/api/patients/1/journal', {
+    method: 'POST',
+    tok: patientToken(),
+    body: {
+      content: 'Detta ska nekas',
+      visibility: 'ALL',
+    },
+  });
+
+  assert.strictEqual(res.status, 403);
+  assert.strictEqual(chain.chain.length, beforeLength + 1);
+
+  const block = chain.getLatestBlock();
+
+  assert.strictEqual(block.data.userId, 3);
+  assert.strictEqual(block.data.patientId, 1);
+  assert.strictEqual(block.data.role, 'PATIENT');
+  assert.strictEqual(block.data.action, 'ACCESS_DENIED');
+  assert.strictEqual(block.data.content, undefined);
+});
+
+test('försök att läsa annan patients journal skapar ACCESS_DENIED i blockchain', async () => {
+  const chain = getAuditChain();
+  const beforeLength = chain.chain.length;
+
+  const res = await call('/api/patients/2/journal', {
+    tok: patientToken(),
+  });
+
+  assert.strictEqual(res.status, 403);
+  assert.strictEqual(chain.chain.length, beforeLength + 1);
+
+  const block = chain.getLatestBlock();
+
+  assert.strictEqual(block.data.userId, 3);
+  assert.strictEqual(block.data.patientId, 2);
+  assert.strictEqual(block.data.role, 'PATIENT');
+  assert.strictEqual(block.data.action, 'ACCESS_DENIED');
+  assert.ok(block.data.timestamp);
 });
