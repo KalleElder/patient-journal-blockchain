@@ -1,26 +1,13 @@
-const { createAuditLog, getAuditChain } = require('../blockchain');
+const { getAuditChain } = require('../blockchain');
 
-// Tillfälligt utvecklingsverktyg. Backendens auditLogger finns inte än, och
-// utan något sätt att skapa ett audit-block i en körande server går det inte
-// att visa broadcast mellan två terminaler.
+// Tillfällig read-only-route för utveckling och demonstration av P2P-synk.
+// Den kan endast läsa blockchainen och kan inte skapa audit-block.
 //
-// Rutterna är avstängda som standard och kräver P2P_DEV_ROUTES=true. De ska
-// tas bort så snart auditLogger finns, eftersom de skriver till kedjan utan
-// inloggning.
+// Routen är avstängd som standard och kräver P2P_DEV_ROUTES=true.
 function registerDevAuditRoutes(app, name) {
   if (process.env.P2P_DEV_ROUTES !== 'true') {
     return false;
   }
-
-  app.post('/api/dev/audit', (req, res) => {
-    try {
-      const block = createAuditLog(req.body || {});
-      res.status(201).json({ index: block.index, hash: block.hash });
-    } catch (error) {
-      // buildAuditData kastar på fält som inte hör hemma i ett audit-block.
-      res.status(400).json({ error: error.message });
-    }
-  });
 
   app.get('/api/dev/chain', (req, res) => {
     const blockchain = getAuditChain();
@@ -33,7 +20,7 @@ function registerDevAuditRoutes(app, name) {
     });
   });
 
-  console.log(`[NODE ${name}] Dev-rutter aktiva: POST /api/dev/audit, GET /api/dev/chain`);
+  console.log(`[NODE ${name}] Dev-route aktiv: GET /api/dev/chain`);
   return true;
 }
 

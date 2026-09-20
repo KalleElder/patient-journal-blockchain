@@ -26,7 +26,7 @@ blockkedjan om det duger, och loggar svaret.
 | Fil | Ansvar |
 | --- | --- |
 | `p2pServer.js` | Socket.io-server och klient, hanterar de tre händelserna |
-| `devAuditRoutes.js` | Tillfälliga utvecklingsrutter, se längre ner |
+| `devAuditRoutes.js` | Tillfällig read-only-route för att inspektera kedjan |
 | `demo.js` | Demonstration av synk och avslag |
 | `p2p.test.js` | Automatiska tester över riktiga sockets |
 
@@ -162,28 +162,25 @@ använder samma genesis, att ett nytt audit-block synkas mellan två noder, att
 en nod som ligger efter hämtar hela kedjan, och att block som kommit över nätet
 är riktiga `Block`-objekt.
 
-## Tillfälliga utvecklingsrutter
+## Tillfällig utvecklingsroute
 
-`devAuditRoutes.js` lägger till två rutter:
+`devAuditRoutes.js` exponerar en read-only-route:
 
-    POST /api/dev/audit    skapar ett audit-block och skickar ut det
-    GET  /api/dev/chain    visar nodens kedja
+    GET /api/dev/chain    visar nodens kedja
 
-De är **avstängda som standard** och kräver `P2P_DEV_ROUTES=true`. De finns
-bara för att backendens `auditLogger` inte är byggd än. Utan dem går det inte
-att skapa ett audit-block i en körande server, och därmed inte heller att visa
-broadcast mellan två terminaler.
+Routen är **avstängd som standard** och kräver `P2P_DEV_ROUTES=true`.
+Den används vid utveckling och demonstration för att verifiera att två noder
+har synkroniserat sina blockkedjor.
+
+Audit-block skapas inte längre genom en oskyddad dev-route. Backendens
+`auditLogger` är nu inkopplad mot journal-API:t, så riktiga journaloperationer
+skapar audit-block som skickas vidare genom P2P-lagret.
+
+Exempel:
 
     PORT=3001 PEER_URL=http://localhost:3002 P2P_DEV_ROUTES=true npm start
 
-    curl -X POST http://localhost:3001/api/dev/audit \
-      -H "Content-Type: application/json" \
-      -d '{"userId":1,"patientId":7,"role":"DOCTOR","action":"READ_JOURNAL","timestamp":"2026-09-09T10:00:00.000Z"}'
-
-    curl http://localhost:3002/api/dev/chain
-
-Rutterna ska tas bort när `auditLogger` finns, eftersom de skriver till kedjan
-utan inloggning.
+    curl http://localhost:3001/api/dev/chain
 
 ## Implementerat
 
@@ -204,4 +201,3 @@ utan inloggning.
 - Merkle Tree
 - Persistens; kedjan ligger i minnet och försvinner när noden stoppas
 - Autentisering mellan noder, vem som helst kan i dag ansluta till en nod
-- Inkoppling mot backendens `auditLogger`
