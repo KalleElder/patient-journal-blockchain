@@ -198,3 +198,29 @@ Version: 0.1
 
 Detta är projektets första API-kontrakt och kan uppdateras när
 implementationen påbörjas.
+
+## Implementerad audit-integration
+
+Journal-API:t är kopplat till blockchainens audit-logg.
+
+Följande actions skapas automatiskt vid lyckade journaloperationer:
+
+- `READ_JOURNAL` vid `GET /api/patients/:id/journal`
+- `CREATE_JOURNAL_ENTRY` vid `POST /api/patients/:id/journal`
+
+Audit-event innehåller endast:
+
+- `userId`
+- `patientId`
+- `role`
+- `action`
+- `timestamp`
+
+Medicinsk journaltext skickas inte till blockchain.
+
+Blockchain-modulens `createAuditLog()` skapar audit-blocket. När servern körs
+med P2P skickas nya lokala audit-block vidare genom den befintliga
+P2P-anslutningen.
+
+`ACCESS_DENIED` är dokumenterad som planerad action men är ännu inte
+inkopplad i patient- och journal-API:t.

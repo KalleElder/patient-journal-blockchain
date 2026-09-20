@@ -1,4 +1,5 @@
 const db = require('../db');
+const { logAuditEvent } = require('../services/auditLogger');
 
 const STAFF_ROLES = ['DOCTOR', 'NURSE', 'CARE_CENTER'];
 const VISIBILITY_VALUES = ['PRIVATE', 'STAFF', 'ALL'];
@@ -94,6 +95,13 @@ function getPatientJournal(req, res) {
         ORDER BY je.created_at
       `).all(patientId, userId);
 
+  logAuditEvent({
+    userId,
+    patientId,
+    role,
+    action: 'READ_JOURNAL',
+  });
+
   res.json(rows.map(toJournalResponse));
 }
 
@@ -133,6 +141,13 @@ function createJournalEntry(req, res) {
     JOIN users u ON u.id = je.author_id
     WHERE je.id = ?
   `).get(lastInsertRowid);
+
+  logAuditEvent({
+    userId,
+    patientId,
+    role,
+    action: 'CREATE_JOURNAL_ENTRY',
+  });
 
   res.status(201).json(toJournalResponse(row));
 }
