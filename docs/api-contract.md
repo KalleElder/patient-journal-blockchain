@@ -111,25 +111,30 @@ Visibility-värden:
 
 ### GET /api/patients/:id/access-logs
 
-Returnerar access logs för en patient om användaren har behörighet att
-se dem.
+Returnerar access logs från blockchainens audit chain. Bearer-token krävs.
+`DOCTOR`, `NURSE` och `CARE_CENTER` får läsa patienters access logs.
+`PATIENT` får endast läsa sina egna access logs; försök att läsa en annan
+patients logs ger 403. Saknad eller ogiltig token ger 401 och en patient som
+inte finns ger 404.
 
-Exempel på planerad response:
+Response:
 
-    [
-      {
-        "userId": 3,
-        "userName": "Dr Anna",
-        "patientId": 7,
-        "role": "DOCTOR",
-        "action": "READ_JOURNAL",
-        "timestamp": "2026-09-10T19:32:00Z",
-        "verified": true
-      }
-    ]
+    {
+      "patientId": 1,
+      "logs": [
+        {
+          "userId": 1,
+          "patientId": 1,
+          "role": "DOCTOR",
+          "action": "READ_JOURNAL",
+          "timestamp": "2026-09-20T10:00:00.000Z"
+        }
+      ]
+    }
 
-Fältet verified kan användas av frontend för att visa om en blockchain-logg
-har verifierats.
+Genesis-blocket och intern blockmetadata som index, hash och previousHash
+returneras inte. Responsen innehåller endast audit-metadata och aldrig
+medicinsk journaltext eller annan medicinsk information.
 
 ## Audit Event
 

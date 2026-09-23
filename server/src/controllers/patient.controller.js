@@ -1,4 +1,5 @@
 const db = require('../db');
+const { getAuditChain } = require('../blockchain');
 const { logAuditEvent } = require('../services/auditLogger');
 
 const STAFF_ROLES = ['DOCTOR', 'NURSE', 'CARE_CENTER'];
@@ -29,6 +30,40 @@ function listPatients(req, res) {
   }
 
   res.json(db.prepare('SELECT id, name FROM patients').all());
+}
+
+function getPatientAccessLogs(req, res) {
+  const patientId = parsePatientId(req.params.id);
+  if (patientId === null) {
+    return res.status(404).json({ error: 'Patienten hittades inte' });
+  }
+
+  const { role, patientId: ownPatientId } = req.user;
+  if (role === 'PATIENT') {
+    if (patientId !== ownPatientId) {
+      return res.status(403).json({ error: 'Åtkomst nekad' });
+    }
+  } else if (!STAFF_ROLES.includes(role)) {
+    return res.status(403).json({ error: 'Åtkomst nekad' });
+  }
+
+  const patient = db.prepare('SELECT id FROM patients WHERE id = ?').get(patientId);
+  if (!patient) {
+    return res.status(404).json({ error: 'Patienten hittades inte' });
+  }
+
+  const logs = getAuditChain().chain
+    .slice(1)
+    .filter((block) => block.data.patientId === patientId)
+    .map((block) => ({
+      userId: block.data.userId,
+      patientId: block.data.patientId,
+      role: block.data.role,
+      action: block.data.action,
+      timestamp: block.data.timestamp,
+    }));
+
+  return res.json({ patientId, logs });
 }
 
 function getPatient(req, res) {
@@ -166,4 +201,10 @@ function createJournalEntry(req, res) {
   res.status(201).json(toJournalResponse(row));
 }
 
-module.exports = { listPatients, getPatient, getPatientJournal, createJournalEntry };
+module.exports = {
+  listPatients,
+  getPatientAccessLogs,
+  getPatient,
+  getPatientJournal,
+  createJournalEntry,
+};
