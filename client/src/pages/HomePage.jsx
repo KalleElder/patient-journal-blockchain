@@ -1,25 +1,24 @@
+import { useState } from "react";
 import UserBar from "../components/UserBar";
+import PatientListPage from "./PatientListPage";
+import JournalPage from "./JournalPage";
 import { ROLES, isStaff } from "../roles";
 
 // Startsidan efter login. Vad som visas beror på rollen från backend.
-// Själva patient- och journalvyerna byggs i nästa steg.
+// Vårdpersonal väljer patient i listan, en patient landar direkt i sin egen journal.
 export default function HomePage({ user, onLogout }) {
+  const [patient, setPatient] = useState(null);
+
   return (
     <>
       <UserBar user={user} onLogout={onLogout} />
       <main>
-        {isStaff(user) && (
-          <section>
-            <h2>Patientsökning</h2>
-            <p>Kommer i nästa steg.</p>
-          </section>
+        {isStaff(user) && !patient && <PatientListPage onSelect={setPatient} />}
+        {isStaff(user) && patient && (
+          <JournalPage user={user} patient={patient} onBack={() => setPatient(null)} />
         )}
         {user.role === ROLES.PATIENT && (
-          <section>
-            <h2>Min journal</h2>
-            <p>Patient-ID: {user.patientId}</p>
-            <p>Kommer i nästa steg.</p>
-          </section>
+          <JournalPage user={user} patient={{ id: user.patientId, name: user.name }} />
         )}
         {!isStaff(user) && user.role !== ROLES.PATIENT && (
           <section>
