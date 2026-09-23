@@ -13,19 +13,20 @@ process.env.DB_PATH = path.join(os.tmpdir(), `patient-journal-test-${process.pid
 
 const db = require('../db');
 const app = require('../app');
-const { getAuditChain } = require('../blockchain');
+const { createAuditLog, getAuditChain } = require('../blockchain');
 
 const schemaSql = fs.readFileSync(path.resolve(__dirname, '../../../database/schema.sql'), 'utf8');
 db.exec(schemaSql);
 
-// Fiktiv fixturdata: två patienter, en läkare, en sjuksköterska och en
-// patientanvändare kopplad till patient 1.
+// Fiktiv fixturdata: två patienter, tre vårdroller och en patientanvändare
+// kopplad till patient 1.
 db.exec(`
   INSERT INTO patients (id, name) VALUES (1, 'Testpatient A'), (2, 'Testpatient B');
   INSERT INTO users (id, username, name, password_hash, role, patient_id) VALUES
     (1, 'doc', 'Doctor One', 'x', 'DOCTOR', NULL),
     (2, 'nurse', 'Nurse Two', 'x', 'NURSE', NULL),
-    (3, 'pat', 'Patient Three', 'x', 'PATIENT', 1);
+    (3, 'pat', 'Patient Three', 'x', 'PATIENT', 1),
+    (4, 'care', 'Care Center Four', 'x', 'CARE_CENTER', NULL);
 `);
 
 function token(payload) {
@@ -35,6 +36,29 @@ function token(payload) {
 const doctorToken = () => token({ userId: 1, role: 'DOCTOR' });
 const nurseToken = () => token({ userId: 2, role: 'NURSE' });
 const patientToken = () => token({ userId: 3, role: 'PATIENT', patientId: 1 });
+const careCenterToken = () => token({ userId: 4, role: 'CARE_CENTER' });
+
+function isolateAuditChain(t) {
+  const blockchain = getAuditChain();
+  const originalChain = blockchain.chain;
+
+  blockchain.chain = [originalChain[0]];
+  t.after(() => {
+    blockchain.chain = originalChain;
+  });
+
+  return blockchain;
+}
+
+function addAuditEvent({
+  userId = 1,
+  patientId = 1,
+  role = 'DOCTOR',
+  action = 'READ_JOURNAL',
+  timestamp = '2026-09-20T10:00:00.000Z',
+} = {}) {
+  return createAuditLog({ userId, patientId, role, action, timestamp });
+}
 
 let server;
 let baseUrl;
@@ -67,6 +91,7 @@ test('skyddade routes utan token ger 401', async () => {
     ['GET', '/api/patients'],
     ['GET', '/api/patients/1'],
     ['GET', '/api/patients/1/journal'],
+    ['GET', '/api/patients/1/access-logs'],
     ['POST', '/api/patients/1/journal'],
   ];
 
@@ -113,6 +138,124 @@ test('patient får 403 om den försöker läsa annan patients journal via URL', 
 test('okänd patient ger 404', async () => {
   const res = await call('/api/patients/999', { tok: doctorToken() });
   assert.strictEqual(res.status, 404);
+});
+
+test('läkare kan läsa en patients access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent();
+
+  const res = await call('/api/patients/1/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(await res.json(), {
+    patientId: 1,
+    logs: [{
+      userId: 1,
+      patientId: 1,
+      role: 'DOCTOR',
+      action: 'READ_JOURNAL',
+      timestamp: '2026-09-20T10:00:00.000Z',
+    }],
+  });
+});
+
+test('sjuksköterska kan läsa en patients access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent();
+
+  const res = await call('/api/patients/1/access-logs', { tok: nurseToken() });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual((await res.json()).logs.length, 1);
+});
+
+test('vårdcentral kan läsa en patients access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent();
+
+  const res = await call('/api/patients/1/access-logs', { tok: careCenterToken() });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual((await res.json()).logs.length, 1);
+});
+
+test('patient kan läsa sina egna access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent({ userId: 3, role: 'PATIENT' });
+
+  const res = await call('/api/patients/1/access-logs', { tok: patientToken() });
+  assert.strictEqual(res.status, 200);
+  const body = await res.json();
+  assert.strictEqual(body.patientId, 1);
+  assert.strictEqual(body.logs[0].userId, 3);
+});
+
+test('patient får 403 för en annan patients access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent({ patientId: 2 });
+
+  const res = await call('/api/patients/2/access-logs', { tok: patientToken() });
+  assert.strictEqual(res.status, 403);
+  assert.deepStrictEqual(await res.json(), { error: 'Åtkomst nekad' });
+});
+
+test('okänd patient ger 404 för access logs', async (t) => {
+  isolateAuditChain(t);
+
+  const res = await call('/api/patients/999/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 404);
+  assert.deepStrictEqual(await res.json(), { error: 'Patienten hittades inte' });
+});
+
+test('genesis-blocket returneras inte i access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent();
+
+  const res = await call('/api/patients/1/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 200);
+  const body = await res.json();
+  assert.strictEqual(body.logs.length, 1);
+  assert.strictEqual(body.logs.some((log) => log.action === 'GENESIS'), false);
+});
+
+test('endast rätt patients events returneras i access logs', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent({ patientId: 1, timestamp: '2026-09-20T10:00:00.000Z' });
+  addAuditEvent({ patientId: 2, timestamp: '2026-09-20T11:00:00.000Z' });
+
+  const res = await call('/api/patients/1/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 200);
+  const body = await res.json();
+  assert.strictEqual(body.logs.length, 1);
+  assert.ok(body.logs.every((log) => log.patientId === 1));
+  assert.strictEqual(body.logs[0].timestamp, '2026-09-20T10:00:00.000Z');
+});
+
+test('access logs innehåller endast tillåten audit-metadata', async (t) => {
+  isolateAuditChain(t);
+  addAuditEvent();
+
+  const res = await call('/api/patients/1/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 200);
+  const body = await res.json();
+
+  assert.deepStrictEqual(Object.keys(body).sort(), ['logs', 'patientId']);
+  assert.strictEqual(body.logs.length, 1);
+  for (const log of body.logs) {
+    assert.deepStrictEqual(
+      Object.keys(log).sort(),
+      ['action', 'patientId', 'role', 'timestamp', 'userId'],
+    );
+    assert.strictEqual(log.content, undefined);
+    assert.strictEqual(log.index, undefined);
+    assert.strictEqual(log.hash, undefined);
+    assert.strictEqual(log.previousHash, undefined);
+  }
+});
+
+test('tom audit-historik ger en tom access-log-lista', async (t) => {
+  isolateAuditChain(t);
+
+  const res = await call('/api/patients/2/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 200);
+  assert.deepStrictEqual(await res.json(), { patientId: 2, logs: [] });
 });
 
 test('vårdpersonal kan skapa journalanteckning', async () => {
