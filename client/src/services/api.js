@@ -49,3 +49,25 @@ export function login(username, password) {
 export function me() {
   return request("/api/auth/me");
 }
+
+// Patienter och journal (docs/api-contract.md). Behörigheten avgörs alltid av
+// backend; frontend visar bara det som backend svarar med.
+
+export function getPatients() {
+  return request("/api/patients");
+}
+
+export function getPatient(patientId) {
+  return request(`/api/patients/${patientId}`);
+}
+
+export function getJournal(patientId) {
+  return request(`/api/patients/${patientId}/journal`);
+}
+
+export function createJournalEntry(patientId, content, visibility) {
+  return request(`/api/patients/${patientId}/journal`, {
+    method: "POST",
+    body: JSON.stringify({ content, visibility }),
+  });
+}

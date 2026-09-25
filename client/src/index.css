@@ -79,3 +79,122 @@ section {
   border-radius: 8px;
   border: 1px solid #d9dee3;
 }
+
+/* Patientlista */
+.patient-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.patient {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  background: #fff;
+  color: #1f2933;
+  border: 1px solid #d9dee3;
+  text-align: left;
+}
+
+.patient:hover {
+  border-color: #1f6feb;
+}
+
+.muted {
+  color: #5f6b7a;
+  font-weight: 400;
+}
+
+.link {
+  background: none;
+  color: #1f6feb;
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+
+/* Journal */
+.journal {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.entry {
+  background: #fff;
+  border: 1px solid #d9dee3;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.entry p {
+  margin: 0.5rem 0 0;
+  white-space: pre-wrap;
+}
+
+.entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.entry-head time {
+  margin-left: auto;
+  color: #5f6b7a;
+}
+
+.tag {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #e5e9ee;
+}
+
+.tag-private {
+  background: #fde8e8;
+  color: #b42318;
+}
+
+.tag-staff {
+  background: #fff4d6;
+  color: #8a5a00;
+}
+
+.tag-all {
+  background: #e1f5e6;
+  color: #1f7a3a;
+}
+
+/* Ny anteckning */
+.new-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #fff;
+  border: 1px solid #d9dee3;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.new-entry h3 {
+  margin: 0;
+}
+
+textarea,
+select {
+  padding: 0.5rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1px solid #b8c0c8;
+  border-radius: 4px;
+}
