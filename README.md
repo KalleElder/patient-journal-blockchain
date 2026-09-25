@@ -250,11 +250,11 @@ installationstest och förberedelse av redovisningen.
 ## Aktuell projektstatus
 
 Projektet är under aktiv utveckling. Följande delar är implementerade och
-verifierade.
+verifierade på `main`.
 
 ### Projektgrund och integration
 
-Kalle har satt upp projektets gemensamma grund:
+Kalle har satt upp och underhållit projektets gemensamma grund:
 
 - repository- och projektstruktur
 - gruppkontrakt
@@ -267,133 +267,150 @@ Kalle har satt upp projektets gemensamma grund:
 - gemensamma npm-scripts
 - lokal setup-guide
 - integrations- och testchecklista
+- dokumenterade standups
 
 Ändringar utvecklas på separata branches och granskas genom Pull Requests innan
-de mergas till main.
+de mergas till `main`.
 
-### Backend och authentication
+### Backend, SQL och authentication
 
-Yamfu har implementerat den första backend- och authentication-grunden.
+Backend använder Express och SQLite.
 
-Följande finns på main:
+Följande finns på `main`:
 
-- Express-backend
-- `GET /api/health`
-- `POST /api/auth/login`
+- login via `POST /api/auth/login`
 - bcrypt för lösenordsverifiering
 - JWT-baserad authentication
 - auth middleware
 - skyddad `GET /api/auth/me`
-- SQLite-databas (`database/schema.sql`, `database/seed.sql`, `npm run db:init`)
-- testanvändare för rollerna `DOCTOR`, `NURSE`, `CARE_CENTER` och `PATIENT`,
-  lagrade i SQLite
+- SQLite-databas för users, patients och journal entries
+- testanvändare för `DOCTOR`, `NURSE`, `CARE_CENTER` och `PATIENT`
+- patient-API
+- journal-API
+- rollbaserade behörighetskontroller
+- skydd mot otillåten åtkomst genom ändrat patient-ID
+- journalnivåerna `PRIVATE`, `STAFF` och `ALL`
+- access-log API via `GET /api/patients/:id/access-logs`
 
-Authentication har efter merge verifierats från main genom manuella
-integrationstester.
+Backend ansvarar för authorization. Frontend används inte som enda
+behörighetskontroll.
 
-Verifierade scenarier:
+### Frontend
 
-- health endpoint svarar med HTTP 200
-- korrekt login ger HTTP 200 och JWT
-- felaktigt lösenord ger HTTP 401
-- skyddad route med giltig Bearer-token ger HTTP 200
-- skyddad route utan token ger HTTP 401
-- `passwordHash` exponeras inte i API-responsen
+Frontend är byggd med React och Vite.
 
-### Frontend och login
+Följande finns på `main`:
 
-Josef har satt upp frontend-grunden i `client/` med React och Vite.
-
-Följande finns på main:
-
-- login-sida mot `POST /api/auth/login`
-- JWT sparas i utvecklingsversionen och skickas som Bearer-token
-- session kontrolleras mot `GET /api/auth/me` vid refresh
-- namn och roll visas efter login
+- login
+- JWT-baserad session mot backend
 - logout
-- rollbaserad startsida (vårdpersonal respektive patient)
-- `npm run install:all` fungerar nu för både server och client
+- rollbaserad startsida
+- patientlista för vårdpersonal
+- sökning/filter av patienter
+- journalvy
+- formulär för nya journalanteckningar
+- val av `PRIVATE`, `STAFF` och `ALL`
+- patientkonto som går direkt till den egna journalen
+- felhantering för relevanta API-fel
 
-Mer information finns i `client/README.md`.
+Frontendens lint och production build har verifierats utan fel.
 
-### Blockchain för access logs
+### Audit logging och blockchain
 
-Tim har implementerat blockchain-grunden i `server/src/blockchain/`.
+Journalflödet är kopplat till blockchainens auditlogg.
 
-Följande finns på main:
+Följande är implementerat:
 
 - `Block` och `Blockchain`
 - SHA-256-hashning med deterministisk serialisering
 - deterministiskt genesis block
-- nya block länkade via `previousHash`
-- `isChainValid()` som upptäcker ändrade, utbytta och ombytta block
-- audit-format enligt `docs/api-contract.md`
-- kontroll som avvisar journaltext, okända fält och fritext i tillåtna fält
-- `createAuditLog()` som gränssnitt mot backendens kommande AuditLogger
-- automatiska tester och ett demonstrationsscript
+- block länkade via `previousHash`
+- validering av kedjan
+- `AuditLogger` mellan backend och blockchain
+- `CREATE_JOURNAL_ENTRY` vid skapad journalanteckning
+- `READ_JOURNAL` vid läsning av journal
+- `ACCESS_DENIED` för implementerade nekade journalförsök
+- access logs med `userId`, `patientId`, `role`, `action` och `timestamp`
+- validering som hindrar journaltext och otillåtna fält från att lagras i
+  blockchain
 
-Blockkedjan är fristående och ännu inte inkopplad i någon route. Den ligger i
-minnet och sparas inte mellan omstarter.
+Medicinsk journaltext lagras i SQL och ska aldrig lagras i blockchain.
 
-Kedjans sista block är ännu inte skyddat mot en omräknad hash, eftersom en
-hashkedja inte kan förankra sitt eget slut. Det löses av signering och
-P2P-synkronisering. Begränsningen är dokumenterad och testad, se
-`server/src/blockchain/README.md`.
+Blockchainen ligger för närvarande i minnet och återställs vid omstart av
+servern.
 
-Mer information finns i `server/src/blockchain/README.md`.
+### P2P mellan servernoder
 
-### P2P mellan noder
+P2P-synkronisering är implementerad med Socket.io.
 
-Tim har implementerat synkronisering mellan noder i `server/src/p2p/`.
+Följande finns på `main`:
 
-Följande är implementerat på main:
+- två samtidiga servernoder
+- Socket.io-server och klient per nod
+- `REQUEST_CHAIN`, `CHAIN` och `NEW_BLOCK`
+- utbyte av blockchain vid anslutning
+- broadcast av nya audit-block
+- validering av mottagen blockchain-data
+- `replaceChain()` som accepterar en giltig längre kedja
+- synkronisering av audit-block mellan noder
 
-- `replaceChain()` som byter ut den lokala kedjan endast om den mottagna är
-  giltig och längre
-- återskapning av mottagna block till riktiga `Block`-objekt, med behållen hash
-- Socket.io-server och klient i varje nod, med händelserna `REQUEST_CHAIN`,
-  `CHAIN` och `NEW_BLOCK`
-- utbyte av kedjor när noderna ansluter, åt båda hållen
-- broadcast när noden själv skapar ett audit-block
-- kontroll av att endast audit-data kommer in över nätet, även när hasharna
-  stämmer
-- loggar per nod, automatiska tester över riktiga sockets och ett
-  demonstrationsscript
+Exempel på två noder:
 
-Två noder startas i varsin terminal från `server/`:
+    PORT=3001 PEER_URL=http://localhost:3002 npm start --prefix server
+    PORT=3002 PEER_URL=http://localhost:3001 npm start --prefix server
 
-    PORT=3001 PEER_URL=http://localhost:3002 npm start
-    PORT=3002 PEER_URL=http://localhost:3001 npm start
+Kedjor med samma längd har ännu ingen färdig fork-hantering.
 
-Kedjor med exakt samma längd hanteras inte ännu. Där behåller varje nod sin
-egen kedja tills fork-hanteringen byggs.
+### Verifierat end-to-end-test
 
-Mer information finns i `server/src/p2p/README.md`.
+Den 25 september 2026 genomfördes ett manuellt integrationstest från aktuell
+`main` med två samtidiga servernoder.
 
-### Server-tester
+Testet verifierade följande flöde:
 
-Serverns automatiska tester kan köras från projektroten med:
+1. `doctor1` loggade in via Node 1 på port 3001.
+2. En journalanteckning skapades via Node 1 och API:t svarade HTTP 201.
+3. Samma journalanteckning lästes via Node 2 på port 3002 med HTTP 200.
+4. `CREATE_JOURNAL_ENTRY` och `READ_JOURNAL` skapades som audit-events.
+5. Audit-events synkroniserades mellan blockchain-noderna.
+6. Båda noderna hade samma kedjelängd och samma senaste hash.
+7. Båda kedjorna rapporterades som giltiga.
+8. Journaltexten förekom inte i blockchain på någon av noderna.
+
+Mer information finns i `docs/integration/test-checklist.md`.
+
+### Automatiska tester
+
+Serverns testsvit körs från projektroten med:
 
     npm run test:server
 
-Integrationen har verifierats lokalt efter merge av blockchain, P2P och SQLite.
+Senaste verifieringen från `main`:
 
-Vid Kalles integrationstest passerade samtliga 54 servertester. Ett
-miljö-/Node-relaterat fel i testet för djupt kapslad P2P-data har observerats
-på en annan utvecklingsmiljö och undersöks separat.
+- 85 tester
+- 85 godkända
+- 0 misslyckade
 
-### Inte implementerat ännu
+Frontend har dessutom verifierats med:
 
-Följande delar återstår eller är planerade för kommande iterationer:
+    npm run lint --prefix client
+    npm run build --prefix client
 
-- patient-API
-- journal-API
-- inkoppling av blockchain mot backendens AuditLogger
-- digital signering och Merkle Tree
-- fork-hantering när två noder har kedjor av exakt samma längd
-- patientsökning, journalvy och access logs i frontend
-- Socket.io mot frontend för liveuppdateringar
-- slutlig end-to-end-integration
+Båda kommandona slutfördes utan fel.
 
-Medicinsk journaldata ska lagras i SQL och ska inte lagras i blockchain.
-Blockchain används för accessloggning och spårbarhet.
+### Återstående arbete
+
+Följande delar återstår eller behöver slutverifieras:
+
+- frontendvy för access logs
+- Socket.io-klient för liveuppdateringar i frontend
+- digital signering om den ingår i slutversionen
+- Merkle Tree om det ingår i slutversionen
+- fork-hantering för kedjor med samma längd om den ingår i slutversionen
+- verification badge om den ingår i slutversionen
+- clean-clone installationstest
+- slutliga screenshots till README
+- slutlig demo och presentation
+
+Den faktiska slutversionen dokumenteras i README efter den sista
+integrations- och installationstesten.
