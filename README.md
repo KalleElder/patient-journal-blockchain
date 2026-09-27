@@ -405,8 +405,8 @@ Serverns testsvit körs från projektroten med:
 
 Senaste körningen av testsviten:
 
-- 110 tester
-- 110 godkända
+- 111 tester
+- 111 godkända
 - 0 misslyckade
 
 Frontend har dessutom verifierats med:

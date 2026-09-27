@@ -167,7 +167,7 @@ Från `server/`:
 
     node --test
 
-110 tester ska passera, varav tolv startar riktiga Socket.io-noder. Testerna
+111 tester ska passera, varav tretton startar riktiga Socket.io-noder. Testerna
 lyssnar på port 0 och låter operativsystemet välja port, så de krockar varken
 med varandra eller med en server som körs samtidigt.
 

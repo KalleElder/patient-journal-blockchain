@@ -5,6 +5,7 @@ const { io: connectToPeer } = require('socket.io-client');
 
 const Block = require('../blockchain/Block');
 const Blockchain = require('../blockchain/Blockchain');
+const { generateKeyPair, signHash } = require('../blockchain/signing');
 const { createP2PNode, EVENTS } = require('./p2pServer');
 
 const auditEvent = Object.freeze({
@@ -241,6 +242,41 @@ test('en nod som ligger efter hämtar hela kedjan när ett block inte passar', a
 
   assert.strictEqual(node2.blockchain.getLatestBlock().hash, node1.blockchain.getLatestBlock().hash);
   assert.strictEqual(node2.blockchain.isChainValid(), true);
+});
+
+// Motsatsen till testet ovan. Ett block som inte passar ovanpå vår kedja, men
+// som är signerat av en nyckel vi inte litar på, ska inte få oss att hämta hela
+// kedjan. Den kedjan skulle avvisas av exakt samma skäl, så begäran är bara
+// arbete som en granne kan beställa gratis.
+test('ett block med otrodd signatur får oss inte att begära kedjan', async (t) => {
+  const node1 = await startaNod(t, { antalBlock: 1 });
+  const angripare = generateKeyPair();
+
+  // Index 3 ligger för långt fram, så blocket passar inte sist i kedjan och
+  // noden skulle annars vilja hämta hela kedjan för att komma i takt.
+  const block = new Block({
+    index: 3,
+    timestamp: '2026-09-27T12:00:00.000Z',
+    data: auditEvent,
+    previousHash: 'a'.repeat(64),
+  });
+  block.signature = signHash(block.hash, angripare.privateKey);
+  block.publicKey = angripare.publicKey;
+
+  const klient = await anslutSomKlient(t, node1.port);
+
+  let antalBegäranden = 0;
+  klient.on(EVENTS.REQUEST_CHAIN, () => { antalBegäranden += 1; });
+
+  // Noden ber om vår kedja så fort vi ansluter. Den begäran hör inte hit.
+  await väntaTills(() => antalBegäranden === 1, 'noden har bett om vår kedja');
+
+  klient.emit(EVENTS.NEW_BLOCK, JSON.parse(JSON.stringify(block)));
+
+  await paus();
+
+  assert.strictEqual(antalBegäranden, 1);
+  assert.strictEqual(node1.blockchain.chain.length, 2);
 });
 
 test('ett manipulerat enskilt block nekas över nätet', async (t) => {

@@ -274,7 +274,7 @@ Från `server/`:
 
     node --test
 
-110 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
+111 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
 backendens route-tester.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
