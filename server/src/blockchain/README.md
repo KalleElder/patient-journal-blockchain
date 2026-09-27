@@ -39,6 +39,7 @@ därför alltid gå via `createAuditLog()`.
 | `Block.js` | Ett enskilt block och dess hash |
 | `Blockchain.js` | Kedjan, genesis block, nya block och validering |
 | `hash.js` | SHA-256 och deterministisk serialisering |
+| `merkle.js` | Merkle-rot över kedjan och bevis för ett enskilt block |
 | `auditLog.js` | Kontroll av audit-format, skyddet mot journaltext |
 | `signing.js` | Ed25519: nyckelpar, signera och verifiera |
 | `keyring.js` | Nodens egen nyckel och vilka publika nycklar den litar på |
@@ -48,6 +49,7 @@ därför alltid gå via `createAuditLog()`.
 | `blockchain.test.js` | Automatiska tester |
 | `sync.test.js` | Tester för synk mellan noder, utan nätverk |
 | `signing.test.js` | Tester för signering och verifiering |
+| `merkle.test.js` | Tester för Merkle-rot och bevis |
 
 Själva nätverket ligger i `server/src/p2p/`, se `server/src/p2p/README.md`.
 
@@ -270,6 +272,43 @@ förgreningspunkten. De skrivs inte om någon annanstans, så ett audit-event so
 bara fanns där är borta. Det är en känd begränsning av den här nivån av
 fork-hantering, inte något koden döljer.
 
+## Merkle Tree
+
+Roten är en hash som sammanfattar alla block i kedjan, och den räknas fram ur
+kedjan när den behövs:
+
+    const root = getAuditChain().getMerkleRoot();
+    const proof = getAuditChain().getMerkleProof(3);
+
+    verifyMerkleProof({ blockHash: block.hash, proof, root });
+
+Roten ligger medvetet utanför blocken. Läggs den in i det som hashas ändras
+genesis-blockets hash, och därmed varje block i varje kedja, utan att kedjan blir
+säkrare. Blockets form är alltså oförändrad och signeringen är orörd.
+
+Nyttan ligger i beviset. Med roten och `log2(n)` hashar går det att visa att ett
+enskilt audit-event ligger i kedjan utan att lämna ut de andra blocken, alltså
+utan att visa andra patienters metadata. Två noder kan också jämföra en enda hash
+i stället för hela kedjan för att se om de har divergerat.
+
+Ett bevis binder blockets hash till kedjan, inte blockets innehåll till hashen.
+Den som tar emot ett block och ett bevis måste därför fortfarande kontrollera
+`hasValidHash()` och `hasValidSignature()`. En ändring där någon räknar om
+blockets hash ändrar roten, medan en ändring där den gamla hashen ligger kvar
+inte gör det, och den fångas av valideringen i stället. Båda varianterna har
+egna tester.
+
+Löv och inre noder hashas med olika prefix, och en udda nod i ett lager lyfts
+upp oförändrad i stället för att paras med sig själv. Dubbleringen är den
+klassiska Merkle-buggen: med den får `[A, B, C]` och `[A, B, C, C]` samma rot,
+och två olika historiker går inte att skilja på. Roten över en känd lista är
+låst till ett fast värde i testerna, på samma sätt som genesis-hashen, så att
+format och ordning inte kan ändras oavsiktligt.
+
+Roten och bevisen är ännu inte inkopplade i P2P-synken eller i något API mot
+backend. Funktionerna finns och är testade, men de anropas inte av något annat än
+testerna.
+
 ## Gränssnitt mot backend
 
 Blockkedjan är medvetet fristående och känner inte till Express, routes eller
@@ -297,7 +336,7 @@ Från `server/`:
 
     node --test
 
-126 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
+145 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
 backendens route-tester.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
@@ -334,13 +373,14 @@ valideringen slår till.
 - Verifiering mot en uppsättning betrodda publika nycklar
 - Skydd av kedjans sista block mot ändring med omräknad hash
 - Fork-hantering för kedjor med samma längd, där lägst hash på sista blocket vinner
+- Merkle-rot över kedjan och bevis för att ett enskilt block ligger i den
 - Automatiska tester och demonstrationsscript
 
 ## Inte implementerat ännu
 
 Detta är kommande arbete och finns alltså inte i koden:
 
-- Merkle Tree
+- Merkle-roten inkopplad i P2P-synken eller i ett API mot backend
 - Persistens; kedjan ligger i minnet och försvinner när servern stoppas
 - Nyckelrotation; byts nodens nyckel ut blir redan signerade block i kedjan
   omöjliga att verifiera, vilket inte märks i dag eftersom kedjan ändå försvinner

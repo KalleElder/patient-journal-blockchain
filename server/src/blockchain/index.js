@@ -1,6 +1,7 @@
 const Block = require('./Block');
 const Blockchain = require('./Blockchain');
 const { buildAuditData, ALLOWED_FIELDS, KNOWN_ROLES } = require('./auditLog');
+const { verifyMerkleProof } = require('./merkle');
 const { configureFromEnv } = require('./keyring');
 
 // Nodens kedja. Den ligger i minnet så länge servern kör. Backendens
@@ -39,6 +40,9 @@ module.exports = {
   createAuditLog,
   getAuditChain,
   setNewBlockListener,
+  // Den som får ett block och ett bevis kan verifiera det mot en rot utan att
+  // ha kedjan.
+  verifyMerkleProof,
   // Servern läser in nycklarna härifrån, så den behöver inte känna till
   // keyring-modulen eller hur nycklarna är kodade.
   configureSigningFromEnv: configureFromEnv,

@@ -1,4 +1,5 @@
 const Block = require('./Block');
+const { merkleRoot, merkleProof } = require('./merkle');
 
 // Genesis-blocket måste bli identiskt på varje nod, annars får noderna olika
 // hashar redan från start och kan aldrig jämföra sina kedjor. Därför är både
@@ -124,6 +125,26 @@ class Blockchain {
     }
 
     return true;
+  }
+
+  // Merkle-roten över kedjans blockhashar. Roten ligger medvetet utanför
+  // blocken och räknas fram ur kedjan när den behövs, så blockets form och
+  // genesis-hashen är orörda.
+  //
+  // Roten sammanfattar hela historiken i en hash och gör det möjligt att bevisa
+  // att ett enskilt audit-event ligger i kedjan utan att lämna ut de andra
+  // blocken, alltså utan att visa andra patienters metadata.
+  //
+  // Returnerar null för en kedja utan block.
+  getMerkleRoot() {
+    return merkleRoot(this.chain.map((block) => block.hash));
+  }
+
+  // Beviset för blocket på plats index i kedjan, alltså samma numrering som
+  // blockets eget index i en giltig kedja. Verifieras med verifyMerkleProof()
+  // mot roten ovan. Returnerar null för ett index utanför kedjan.
+  getMerkleProof(index) {
+    return merkleProof(this.chain.map((block) => block.hash), index);
   }
 
   // Tar emot en kedja från en annan nod. Den lokala kedjan byts bara ut om den
