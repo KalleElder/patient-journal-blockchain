@@ -8,6 +8,7 @@ const {
   merkleProof,
   verifyMerkleProof,
   MAX_BEVISLÄNGD,
+  MAX_ANTAL_LÖV,
   leafHash,
   nodeHash,
 } = require('./merkle');
@@ -247,6 +248,32 @@ test('en kedja utan block ger ingen rot och inga bevis', () => {
 
   assert.strictEqual(tom.getMerkleRoot(), null);
   assert.strictEqual(tom.getMerkleProof(0), null);
+});
+
+// En gles array ser hel ut för every(), som hoppar över hål. Hålen blir undefined
+// och skulle hashas som vilket löv som helst, så roten över Array(3) hade sett ut
+// som en rot över tre block.
+test('en gles lista räknas inte som en lista med hashar', () => {
+  const hashar = fejkHashar(3);
+  const medHål = [...hashar];
+  delete medHål[1];
+
+  assert.strictEqual(merkleRoot(Array(1)), null);
+  assert.strictEqual(merkleRoot(Array(3)), null);
+  assert.strictEqual(merkleRoot(medHål), null);
+  assert.strictEqual(merkleProof(Array(1), 0), null);
+  assert.strictEqual(merkleProof(medHål, 0), null);
+});
+
+// Varje löv kostar en hashning, och arbetet är synkront. Taket gör att en lång
+// lista inte kan låsa noden medan trädet byggs. Precis som kedjetaket är det en
+// begränsning av skadan, inte ett skydd i sig.
+test('en lista över taket ger null, en lista vid taket ger en rot', () => {
+  const vidTaket = fejkHashar(MAX_ANTAL_LÖV);
+
+  assert.match(merkleRoot(vidTaket), /^[0-9a-f]{64}$/);
+  assert.strictEqual(merkleRoot([...vidTaket, sha256('ett för många')]), null);
+  assert.strictEqual(merkleProof([...vidTaket, sha256('ett för många')], 0), null);
 });
 
 // Listan kan komma utifrån, och då ska svaret vara null i stället för ett kast.

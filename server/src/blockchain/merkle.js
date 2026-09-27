@@ -13,10 +13,34 @@ const NODE_PREFIX = 'patient-journal-merkle-node-v1:';
 // producera själva men är bundet.
 const MAX_BEVISLÄNGD = 64;
 
+// Tak på hur många löv ett träd får ha. Samma tak som på en inkommande kedja i
+// Blockchain.js, eftersom det är kedjans block som blir löv. Utan tak kan en
+// tillräckligt lång lista låsa nodens event loop medan trädet byggs.
+const MAX_ANTAL_LÖV = 10000;
+
 const HASH_FORM = /^[0-9a-f]{64}$/;
 
 function ärHash(värde) {
   return typeof värde === 'string' && HASH_FORM.test(värde);
+}
+
+// Listan gås igenom med index och inte med every(), eftersom every() hoppar
+// över hål i en gles array. Array(3) skulle annars räknas som tre giltiga
+// hashar, och trädet byggas av undefined.
+function ärHashlista(hashar) {
+  if (!Array.isArray(hashar)
+    || hashar.length === 0
+    || hashar.length > MAX_ANTAL_LÖV) {
+    return false;
+  }
+
+  for (let i = 0; i < hashar.length; i += 1) {
+    if (!ärHash(hashar[i])) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 function leafHash(blockHash) {
@@ -46,7 +70,7 @@ function nästaLager(lager) {
 // Roten över en lista av blockhashar. Returnerar null om listan är tom eller
 // innehåller något som inte är en hash, eftersom listan kan komma utifrån.
 function merkleRoot(hashar) {
-  if (!Array.isArray(hashar) || hashar.length === 0 || !hashar.every(ärHash)) {
+  if (!ärHashlista(hashar)) {
     return null;
   }
 
@@ -65,8 +89,7 @@ function merkleRoot(hashar) {
 //
 // Returnerar null om listan eller indexet inte går att använda.
 function merkleProof(hashar, index) {
-  if (!Array.isArray(hashar)
-    || !hashar.every(ärHash)
+  if (!ärHashlista(hashar)
     || !Number.isInteger(index)
     || index < 0
     || index >= hashar.length) {
@@ -138,6 +161,7 @@ module.exports = {
   merkleProof,
   verifyMerkleProof,
   MAX_BEVISLÄNGD,
+  MAX_ANTAL_LÖV,
   // Exporteras för att testerna ska kunna bygga träd och bevis själva i stället
   // för att lita på funktionerna de kontrollerar.
   leafHash,

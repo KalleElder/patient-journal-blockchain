@@ -286,10 +286,17 @@ Roten ligger medvetet utanför blocken. Läggs den in i det som hashas ändras
 genesis-blockets hash, och därmed varje block i varje kedja, utan att kedjan blir
 säkrare. Blockets form är alltså oförändrad och signeringen är orörd.
 
-Nyttan ligger i beviset. Med roten och `log2(n)` hashar går det att visa att ett
-enskilt audit-event ligger i kedjan utan att lämna ut de andra blocken, alltså
-utan att visa andra patienters metadata. Två noder kan också jämföra en enda hash
-i stället för hela kedjan för att se om de har divergerat.
+Nyttan ligger i beviset. Med roten och som mest ungefär `log2(n)` hashar går det
+att visa att ett enskilt audit-event ligger i kedjan utan att lämna ut de andra
+blocken, alltså utan att visa andra patienters metadata. Ett bevis innehåller
+dock syskonens hashar och blockets plats i trädet, så den som redan känner till
+ett annat blocks hash kan se att det ligger intill. Ingen metadata läcker, men
+sambandet gör det, och därför ska bevis inte spridas fritare än blocken själva.
+
+Två noder kan också jämföra en enda hash i stället för hela kedjan för att se om
+de har divergerat. Jämförelsen täcker blockens hashar, alltså index, timestamp,
+data och previousHash. Skiljer sig bara `signature` eller `publicKey` mellan två
+kedjor får de samma rot, eftersom signaturen ligger utanför blockets hash.
 
 Ett bevis binder blockets hash till kedjan, inte blockets innehåll till hashen.
 Den som tar emot ett block och ett bevis måste därför fortfarande kontrollera
@@ -304,6 +311,11 @@ klassiska Merkle-buggen: med den får `[A, B, C]` och `[A, B, C, C]` samma rot,
 och två olika historiker går inte att skilja på. Roten över en känd lista är
 låst till ett fast värde i testerna, på samma sätt som genesis-hashen, så att
 format och ordning inte kan ändras oavsiktligt.
+
+En lista som kommer utifrån gås igenom med index och inte med `every()`, som
+hoppar över hål i en gles array, och antalet löv har samma tak som en inkommande
+kedja. Utan det skulle `Array(3)` räknas som tre block och en lång lista kunna
+låsa noden medan trädet byggs.
 
 Roten och bevisen är ännu inte inkopplade i P2P-synken eller i något API mot
 backend. Funktionerna finns och är testade, men de anropas inte av något annat än
@@ -336,7 +348,7 @@ Från `server/`:
 
     node --test
 
-145 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
+147 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
 backendens route-tester.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
