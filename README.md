@@ -247,6 +247,158 @@ Vi försöker ha en komplett fungerande version klar senast torsdag
 Sista tiden används till tester, buggrättning, README, screenshots,
 installationstest och förberedelse av redovisningen.
 
+## Installation och start
+
+### Krav
+
+För att köra projektet lokalt behövs:
+
+- Git
+- Node.js `^20.19.0` eller `>=22.12.0`
+- npm
+
+Projektet har verifierats med Node.js 24.13.0.
+
+### 1. Klona projektet
+
+```bash
+git clone https://github.com/KalleElder/patient-journal-blockchain.git
+cd patient-journal-blockchain
+```
+
+### 2. Installera dependencies
+
+Kör från projektroten:
+
+```bash
+npm run install:all
+```
+
+Det installerar dependencies för både backend och frontend.
+
+### 3. Skapa lokal miljökonfiguration
+
+Kopiera exempelkonfigurationen:
+
+```bash
+cp .env.example .env
+```
+
+Skapa ett lokalt JWT-secret, exempelvis:
+
+```bash
+JWT_SECRET_VALUE="$(openssl rand -hex 32)"
+sed -i '' "s/^JWT_SECRET=.*/JWT_SECRET=$JWT_SECRET_VALUE/" .env
+unset JWT_SECRET_VALUE
+```
+
+Kommandot ovan använder macOS-versionen av `sed`. På andra operativsystem kan
+motsvarande kommando skilja sig.
+
+### 4. Skapa blockchain-nycklar
+
+Generera ett Ed25519-nyckelpar:
+
+```bash
+npm run keys:generate --prefix server
+```
+
+Lägg de genererade värdena för `BLOCKCHAIN_PRIVATE_KEY` och
+`BLOCKCHAIN_TRUSTED_KEYS` i `.env`.
+
+Den privata nyckeln får aldrig committas till Git.
+
+### 5. Initiera databasen
+
+```bash
+npm run db:init
+```
+
+Databasen skapas från `database/schema.sql` och innehåller lokal testdata.
+
+### 6. Starta backend
+
+```bash
+npm run start:server
+```
+
+Backend körs som standard på:
+
+```text
+http://localhost:3001
+```
+
+Health check:
+
+```text
+GET http://localhost:3001/api/health
+```
+
+### 7. Starta frontend
+
+Öppna en ny terminal i projektroten och kör:
+
+```bash
+npm run start:client
+```
+
+Frontend körs som standard på:
+
+```text
+http://localhost:5173
+```
+
+### Testanvändare
+
+Den lokala databasen innehåller följande testkonton:
+
+| Användarnamn | Lösenord | Roll |
+| --- | --- | --- |
+| `doctor1` | `password123` | Läkare |
+| `nurse1` | `password123` | Sjuksköterska |
+| `carecenter1` | `password123` | Vårdcentral |
+| `patient1` | `password123` | Patient |
+
+### Tester
+
+Serverns automatiska tester:
+
+```bash
+npm run test:server
+```
+
+Frontendens lint och production build:
+
+```bash
+npm run lint --prefix client
+npm run build --prefix client
+```
+
+### Verifierad clean-clone-installation
+
+Den 27 september 2026 verifierades installationen från en helt ny klon av
+projektet.
+
+Testet verifierade:
+
+- installation av backend- och frontend-dependencies
+- skapande av lokal `.env`
+- generering och konfiguration av Ed25519-nycklar
+- initiering av SQLite-databasen
+- 126 av 126 godkända servertester
+- frontend-lint utan fel eller varningar
+- lyckad production build av frontend
+- start av backend
+- HTTP 200 från `/api/health`
+- login som `doctor1`
+- start av React/Vite-frontend
+- visning av patientlista
+- öppning av patientens journalvy
+
+Clean-clone-testet upptäckte även att root-scriptet för frontend använde ett
+saknat `start`-script. Root-scriptet korrigerades till att starta klientens
+Vite `dev`-script.
+
 ## Aktuell projektstatus
 
 Projektet är under aktiv utveckling. Följande delar är implementerade och
@@ -427,9 +579,8 @@ Följande delar återstår eller behöver slutverifieras:
 - Socket.io-klient för liveuppdateringar i frontend
 - Merkle Tree
 - verification badge om den ingår i slutversionen
-- clean-clone installationstest
 - slutliga screenshots till README
 - slutlig demo och presentation
 
-Den faktiska slutversionen dokumenteras i README efter den sista
-integrations- och installationstesten.
+Den faktiska slutversionen dokumenteras i README efter den sista integrationen
+och sluttesterna.
