@@ -365,6 +365,7 @@ Följande finns på `main`:
 - validering av mottagen blockchain-data
 - kontroll av att inkommande block är signerade av en betrodd nyckel
 - `replaceChain()` som accepterar en giltig längre kedja
+- fork-hantering när två kedjor är lika långa, där lägst hash på sista blocket vinner
 - synkronisering av audit-block mellan noder
 
 Exempel på två noder:
@@ -375,7 +376,9 @@ Exempel på två noder:
 Noderna behöver dela nycklar för att acceptera varandras block. Kör man dem från
 samma `.env` fungerar det direkt.
 
-Kedjor med samma längd har ännu ingen färdig fork-hantering.
+Är två kedjor exakt lika långa avgörs valet av hashen på sista blocket, och den
+lägsta vinner. Båda noderna räknar fram samma svar och landar därför på samma
+kedja. En kortare kedja avvisas fortfarande direkt.
 
 Mer information finns i `server/src/p2p/README.md`.
 
@@ -405,8 +408,8 @@ Serverns testsvit körs från projektroten med:
 
 Senaste körningen av testsviten:
 
-- 111 tester
-- 111 godkända
+- 126 tester
+- 126 godkända
 - 0 misslyckade
 
 Frontend har dessutom verifierats med:
@@ -423,7 +426,6 @@ Följande delar återstår eller behöver slutverifieras:
 - frontendvy för access logs
 - Socket.io-klient för liveuppdateringar i frontend
 - Merkle Tree
-- fork-hantering för kedjor med samma längd
 - verification badge om den ingår i slutversionen
 - clean-clone installationstest
 - slutliga screenshots till README

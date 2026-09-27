@@ -292,7 +292,7 @@ test('replaceChain talar om varför en kedja nekades', () => {
 
   assert.match(skäl[0], /nyckel vi inte litar på/);
   assert.match(skäl[1], /gick inte att läsa/);
-  assert.match(skäl[2], /inte längre än vår egen/);
+  assert.match(skäl[2], /lika lång fork/);
 });
 
 test('en trasig privat nyckel stoppar konfigurationen i stället för att tystna', (t) => {
