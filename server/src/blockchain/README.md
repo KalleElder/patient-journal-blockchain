@@ -220,7 +220,8 @@ avvisar block från andra noder, och det loggas vid start.
 ## Synk mellan noder
 
 `replaceChain(receivedChain)` tar emot en kedja från en annan nod och ersätter
-den lokala bara om den inkommande är **giltig och längre**. Kedjan återskapas
+den lokala bara om den inkommande är **giltig och antingen längre eller en fork
+som vinner tiebreaken** nedan. Kedjan återskapas
 först till riktiga `Block`-objekt med `Blockchain.fromJSON()`, eftersom en
 kedja som kommit via JSON bara innehåller vanliga objekt utan metoder.
 
@@ -244,8 +245,30 @@ kan den som får ansluta skicka en enorm kedja och låsa nodens event loop. Take
 begränsar skadan men löser inte grundproblemet, som är att anslutningarna inte är
 autentiserade.
 
-Kedjor med exakt samma längd hanteras inte. Där behålls den lokala kedjan tills
-fork-hanteringen byggs.
+## Fork-hantering
+
+Två noder kan hamna med olika kedjor av exakt samma längd, till exempel om båda
+skriver ett audit-block medan kopplingen mellan dem ligger nere. Då avgör hashen
+på sista blocket, och den lägsta vinner.
+
+Regeln räknas fram ur kedjorna själva och blir därför densamma på båda noderna,
+så de landar på samma kedja i stället för att skriva över varandra fram och
+tillbaka. Är hasharna lika är det redan samma kedja och ingenting byts ut.
+
+Tiebreaken gäller bara vid exakt samma längd. En kortare kedja avvisas
+fortfarande direkt, hur låg dess hash än är, annars skulle en granne kunna
+skriva om vår historik med en kedja som är sämre än den vi redan har.
+
+Jämförelsen görs på en hash som ännu inte är verifierad, så en granne kan hitta
+på ett lågt värde för att vinna. Det ger ingenting, eftersom `isChainValid()`
+körs efteråt och kräver att hashen stämmer med blockets innehåll och att
+signaturen är gjord över just den hashen. En fork går alltså igenom exakt samma
+kontroller som en längre kedja.
+
+Förlorar vår gren försvinner de block vi själva hade lagt till efter
+förgreningspunkten. De skrivs inte om någon annanstans, så ett audit-event som
+bara fanns där är borta. Det är en känd begränsning av den här nivån av
+fork-hantering, inte något koden döljer.
 
 ## Gränssnitt mot backend
 
@@ -274,7 +297,7 @@ Från `server/`:
 
     node --test
 
-111 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
+126 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
 backendens route-tester.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
@@ -310,6 +333,7 @@ valideringen slår till.
 - Ed25519-signering av varje audit-block
 - Verifiering mot en uppsättning betrodda publika nycklar
 - Skydd av kedjans sista block mot ändring med omräknad hash
+- Fork-hantering för kedjor med samma längd, där lägst hash på sista blocket vinner
 - Automatiska tester och demonstrationsscript
 
 ## Inte implementerat ännu
@@ -317,7 +341,6 @@ valideringen slår till.
 Detta är kommande arbete och finns alltså inte i koden:
 
 - Merkle Tree
-- Fork-hantering när två kedjor har exakt samma längd
 - Persistens; kedjan ligger i minnet och försvinner när servern stoppas
 - Nyckelrotation; byts nodens nyckel ut blir redan signerade block i kedjan
   omöjliga att verifiera, vilket inte märks i dag eftersom kedjan ändå försvinner

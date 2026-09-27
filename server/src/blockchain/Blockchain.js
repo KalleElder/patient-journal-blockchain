@@ -127,11 +127,10 @@ class Blockchain {
   }
 
   // Tar emot en kedja från en annan nod. Den lokala kedjan byts bara ut om den
-  // inkommande är både längre och giltig. Är den kortare, lika lång, trasig
-  // eller manipulerad behåller noden sin egen kedja.
+  // inkommande är giltig och antingen längre, eller lika lång och vinnare av
+  // tiebreaken nedan. Är den kortare, trasig eller manipulerad behåller noden
+  // sin egen kedja.
   //
-  // Att två noder har olika kedjor med exakt samma längd hanteras inte här.
-  // Då vinner den lokala kedjan tills vi bygger riktig fork-hantering.
   // onReject är valfri och får skälet till avslaget, så att den som anropar kan
   // logga något begripligt. Skälet lämnas här i stället för att räknas ut i
   // efterhand, eftersom en granne då hade kunnat få oss att validera samma kedja
@@ -151,8 +150,24 @@ class Blockchain {
       return avslå('gick inte att läsa som en kedja');
     }
 
-    if (candidate.chain.length <= this.chain.length) {
-      return avslå('inte längre än vår egen');
+    if (candidate.chain.length < this.chain.length) {
+      return avslå('kortare än vår egen');
+    }
+
+    // Två giltiga kedjor med exakt samma längd är en fork, och då avgör hashen
+    // på sista blocket. Lägst hash vinner. Regeln räknas fram ur kedjorna själva
+    // och blir därför densamma på båda noderna, så de landar på samma kedja i
+    // stället för att skriva över varandra fram och tillbaka. Är hasharna lika
+    // är det redan samma kedja och det finns inget att byta till.
+    //
+    // Jämförelsen sker på en hash som ännu inte är verifierad, så en granne kan
+    // hitta på ett lågt värde för att vinna. Det ger ingenting, eftersom
+    // isChainValid() nedan ändå kräver att hashen stämmer med blockets innehåll
+    // och att signaturen är gjord över just den hashen. Längdkravet ovan ligger
+    // kvar oförändrat: en kortare kedja vinner aldrig, hur låg hashen än är.
+    if (candidate.chain.length === this.chain.length
+      && candidate.getLatestBlock().hash >= this.getLatestBlock().hash) {
+      return avslå('lika lång fork som inte vinner på hash');
     }
 
     // Valideras som en hel kedja, vilket också kontrollerar att den andra
