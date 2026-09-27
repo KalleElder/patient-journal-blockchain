@@ -1,4 +1,13 @@
 const { sha256 } = require('./hash');
+const { signHash, verifyHash, ärNyckelsträng } = require('./signing');
+const { getSigningKey, isTrusted } = require('./keyring');
+
+// Signatur och publik nyckel är antingen frånvarande eller nyckelsträngar.
+// Skickar en granne ett tal, ett objekt eller en flera megabyte lång sträng ska
+// blocket avvisas redan här.
+function ärSignaturfält(värde) {
+  return värde === null || värde === undefined || ärNyckelsträng(värde);
+}
 
 // Ett blocks data är alltid platt: några fält med primitiva värden. Genom att
 // kräva det redan innan blocket byggs stoppas bland annat djupt kapslade
@@ -25,6 +34,10 @@ class Block {
     this.data = structuredClone(data);
     this.previousHash = previousHash;
     this.hash = this.calculateHash();
+    // Ett nybyggt block är osignerat. Signaturen sätts av sign() efteråt,
+    // eftersom den måste göras över en färdig hash.
+    this.signature = null;
+    this.publicKey = null;
   }
 
   calculateHash() {
@@ -42,6 +55,26 @@ class Block {
     return this.hash === this.calculateHash();
   }
 
+  // Signerar blocket med nodens egen nyckel. Signaturen läggs utanför hashen,
+  // så den ändrar inte blockets hash och bryter inte länken till nästa block.
+  sign() {
+    const { privateKey, publicKey } = getSigningKey();
+
+    this.signature = signHash(this.hash, privateKey);
+    this.publicKey = publicKey;
+    return this;
+  }
+
+  // Sant om blocket är signerat av en nyckel noden litar på, och signaturen är
+  // gjord över just den hash blocket bär nu.
+  //
+  // Det är detta som stoppar den som ändrar data och räknar om hashen. Den nya
+  // hashen täcks inte av den gamla signaturen, och för att signera om blocket
+  // krävs en privat nyckel som noden litar på.
+  hasValidSignature() {
+    return isTrusted(this.publicKey) && verifyHash(this.hash, this.signature, this.publicKey);
+  }
+
   // Återskapar ett block ur vanlig JSON, till exempel en kedja som kommit in
   // över nätverket. Där är blocken bara objekt och saknar hasValidHash().
   // Den medskickade hashen behålls i stället för att räknas om, annars skulle
@@ -55,7 +88,9 @@ class Block {
     const harBlockformat = Number.isInteger(plain.index)
       && typeof plain.timestamp === 'string'
       && typeof plain.previousHash === 'string'
-      && typeof plain.hash === 'string';
+      && typeof plain.hash === 'string'
+      && ärSignaturfält(plain.signature)
+      && ärSignaturfält(plain.publicKey);
 
     if (!harBlockformat || !ärPlattData(plain.data)) {
       return null;
@@ -71,7 +106,12 @@ class Block {
         previousHash: plain.previousHash,
       });
 
+      // Hash, signatur och publik nyckel behålls precis som de kom in. Skulle
+      // någon av dem räknas om eller sättas på nytt här skulle ett manipulerat
+      // block bli giltigt i samma stund som det togs emot.
       block.hash = plain.hash;
+      block.signature = plain.signature ?? null;
+      block.publicKey = plain.publicKey ?? null;
       return block;
     } catch {
       return null;

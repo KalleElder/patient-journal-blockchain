@@ -1,10 +1,11 @@
 const Block = require('./Block');
 const Blockchain = require('./Blockchain');
 const { buildAuditData, ALLOWED_FIELDS, KNOWN_ROLES } = require('./auditLog');
+const { configureFromEnv } = require('./keyring');
 
-// Nodens kedja. Den ligger i minnet så länge servern kör och är ännu inte
-// inkopplad i någon route. Backendens auditLogger ska kunna anropa
-// createAuditLog() utan att känna till hur block eller hashning fungerar.
+// Nodens kedja. Den ligger i minnet så länge servern kör. Backendens
+// auditLogger anropar createAuditLog() utan att känna till hur block, hashning
+// eller signering fungerar.
 const auditChain = new Blockchain();
 
 // P2P-lagret registrerar sig här för att få veta när noden själv har skapat
@@ -38,6 +39,9 @@ module.exports = {
   createAuditLog,
   getAuditChain,
   setNewBlockListener,
+  // Servern läser in nycklarna härifrån, så den behöver inte känna till
+  // keyring-modulen eller hur nycklarna är kodade.
+  configureSigningFromEnv: configureFromEnv,
   ALLOWED_FIELDS,
   KNOWN_ROLES,
 };

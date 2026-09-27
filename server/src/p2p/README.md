@@ -46,6 +46,10 @@ Terminal 2:
 Noden startar även utan `PEER_URL` och kör då ensam. `PEER_URL` kan innehålla
 flera adresser separerade med komma om vi senare vill köra fler än två noder.
 
+Noderna behöver också nycklar för att acceptera varandras block. Kör man båda
+från samma `.env` delar de nyckel och synkar direkt, se avsnittet om nycklar i
+`server/src/blockchain/README.md`.
+
 Det gör inget att den ena noden startar först. Den loggar att grannen inte går
 att nå och Socket.io fortsätter försöka i bakgrunden.
 
@@ -79,11 +83,22 @@ Två noder med olika kedjor av exakt samma längd är en fork. Där vinner den
 lokala kedjan tills vi bygger riktig fork-hantering, annars skulle noderna
 kunna skriva över varandra fram och tillbaka i all oändlighet.
 
+`isChainValid()` kontrollerar numera också att varje block är signerat av en
+nyckel noden litar på, se avsnittet om signering i
+`server/src/blockchain/README.md`. En kedja från en nod vars publika nyckel inte
+står i `BLOCKCHAIN_TRUSTED_KEYS` avvisas alltså även om den hashar helt korrekt.
+Loggen säger uttryckligen att det var signaturen, eftersom en felstavad
+nyckellista annars är omöjlig att skilja från en manipulerad kedja.
+
 ### När ett enskilt block tas emot
 
 Ett block läggs bara till om det passar direkt ovanpå nodens sista block.
 Gör det inte det ligger noderna isär, och då begär noden hela kedjan i stället
 för att gissa var blocket hör hemma.
+
+Är blocket signerat av en nyckel vi inte litar på begärs kedjan däremot inte,
+eftersom den skulle avvisas av exakt samma skäl. Utan den kontrollen skulle
+varje nytt block hos en nod med fel nyckel dra igång en hel kedjeöverföring.
 
 ## Blocken måste återskapas
 
@@ -152,7 +167,7 @@ Från `server/`:
 
     node --test
 
-54 tester ska passera, varav tolv startar riktiga Socket.io-noder. Testerna
+110 tester ska passera, varav tolv startar riktiga Socket.io-noder. Testerna
 lyssnar på port 0 och låter operativsystemet välja port, så de krockar varken
 med varandra eller med en server som körs samtidigt.
 
@@ -192,12 +207,13 @@ Exempel:
 - Utbyte av kedjor när noderna ansluter, åt båda hållen
 - Broadcast när noden själv skapar ett audit-block
 - Kontroll av att endast audit-data kommer in över nätet
+- Kontroll av att inkommande block är signerade av en betrodd nyckel
 - Loggar per nod och demonstrationsscript
 
 ## Inte implementerat ännu
 
 - Fork-hantering när två kedjor har exakt samma längd
-- Digital signering och verifiering av vem som skapade ett block
 - Merkle Tree
 - Persistens; kedjan ligger i minnet och försvinner när noden stoppas
-- Autentisering mellan noder, vem som helst kan i dag ansluta till en nod
+- Autentisering av själva anslutningen; vem som helst kan fortfarande ansluta och
+  begära vår kedja, även om de inte längre kan få in egna block i den

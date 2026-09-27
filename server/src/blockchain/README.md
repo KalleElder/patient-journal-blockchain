@@ -40,10 +40,14 @@ därför alltid gå via `createAuditLog()`.
 | `Blockchain.js` | Kedjan, genesis block, nya block och validering |
 | `hash.js` | SHA-256 och deterministisk serialisering |
 | `auditLog.js` | Kontroll av audit-format, skyddet mot journaltext |
+| `signing.js` | Ed25519: nyckelpar, signera och verifiera |
+| `keyring.js` | Nodens egen nyckel och vilka publika nycklar den litar på |
+| `generateKeys.js` | Skriver ut ett nytt nyckelpar att lägga i `.env` |
 | `index.js` | Modulens utsida, bland annat `createAuditLog()` |
 | `demo.js` | Demonstrationsscript |
 | `blockchain.test.js` | Automatiska tester |
 | `sync.test.js` | Tester för synk mellan noder, utan nätverk |
+| `signing.test.js` | Tester för signering och verifiering |
 
 Själva nätverket ligger i `server/src/p2p/`, se `server/src/p2p/README.md`.
 
@@ -62,7 +66,9 @@ Ett block innehåller:
         timestamp: "2026-09-07T11:59:58.000Z"
       },
       previousHash: "af70c924...",
-      hash: "c70b7c6e..."
+      hash: "c70b7c6e...",
+      signature: "K1dQ8f...",
+      publicKey: "MCowBQYDK2VwAyEA..."
     }
 
 Blockets `timestamp` är när blocket skapades. `data.timestamp` är när själva
@@ -102,36 +108,114 @@ samma genesis block och kan jämföra sina kedjor när P2P byggs.
 - kedjan inte är tom
 - genesis-blockets sparade hash stämmer med dess innehåll
 - genesis-blocket är det kanoniska genesis-blocket
+- genesis-blocket är osignerat
 - varje blocks sparade hash stämmer med en omräkning av innehållet
+- varje blocks signatur är gjord över just den hashen, av en nyckel vi litar på
 - varje blocks `previousHash` matchar föregående blocks hash
 - indexen följer på varandra
 
 Ändrar någon data i ett gammalt block räcker det inte att räkna om just det
 blockets hash, eftersom nästa block fortfarande pekar på den gamla hashen.
 
-### Känd begränsning: kedjans sista block
+Varje block utom genesis får alltså samma fyra kontroller: hash, signatur,
+länk bakåt och index. Genesis får tre egna i stället, eftersom det inte har
+något föregående block att jämföras mot: hash, kanonisk hash och att det är
+osignerat.
+
+### Kedjans sista block
 
 Skyddet mot en omräknad hash kommer från nästa blocks `previousHash`. Sista
-blocket har ingen efterföljare, och kan därför ändras med omräknad hash eller
-tas bort helt utan att `isChainValid()` slår till.
+blocket har ingen efterföljare och var därför länge oskyddat: den som ändrade
+innehållet och räknade om hashen gick rakt igenom valideringen. Det var en
+dokumenterad begränsning ända fram till signeringen.
 
-Det är inte en bugg som går att koda bort inne i den här klassen. En hashkedja
-kan inte förankra sitt eget slut på egen hand.
+Signeringen stänger hålet. Signaturen är gjord över blockets hash, så en
+omräknad hash täcks inte längre av den gamla signaturen, och för att signera om
+blocket krävs en privat nyckel noden litar på. Båda varianterna av angreppet har
+egna tester: ändrad data med kvarlämnad hash, och ändrad data med omräknad hash.
 
-P2P-synken mildrar det numera: en nod som tappat sitt sista block har en
-kortare kedja än grannen och får den ersatt vid nästa synk. Ändras sista
-blocket med omräknad hash utan att längden ändras upptäcks det dock inte, och
-det löses först av signering som knyter varje block till en nyckel.
-
-Begränsningen har ett eget test, `KÄND BEGRÄNSNING: sista blocket är ännu inte
-skyddat mot omräknad hash`, så att den syns i testkörningen och så att testet
-faller när skyddet väl byggs.
+Kvar finns att ett **borttaget** sista block inte kan upptäckas av valideringen
+ensam. En hashkedja kan inte se vad den inte längre har. Där är det P2P-synken
+som räddar oss, eftersom noden då har en kortare kedja än grannen och får den
+ersatt. Även det har ett eget test.
 
 Genesis behöver två kontroller, inte en. Den som ändrar innehållet men låter
 den gamla hashen ligga kvar fångas av hash-omräkningen. Den som byter ut hela
 blocket och räknar om hashen fångas av jämförelsen mot det kanoniska
 genesis-blocket. Ingen av kontrollerna räcker ensam, eftersom genesis inte har
 något föregående block som kan avslöja en ändring.
+
+## Signering
+
+Varje audit-block signeras med nodens privata nyckel. Signaturen görs över
+blockets hash, och eftersom hashen täcker index, timestamp, data och
+previousHash binder signaturen hela blockets innehåll.
+
+Signaturen ingår däremot inte i hashen. Gjorde den det skulle hashen behöva vara
+färdig innan den kunde beräknas, och nästa blocks `previousHash` skulle peka på
+en hash som ändrades i samma stund blocket signerades.
+
+Algoritmen är Ed25519. Den valdes framför RSA eftersom den inte har några
+parametrar att välja fel på, och för att nycklarna är korta nog att bäras som en
+rad i `.env`.
+
+Signaturen görs över en domänsträng plus hashen, inte över hashen ensam. En
+signatur över bara en hash säger "jag har signerat den här hex-strängen" utan att
+säga till vad. Skulle samma nyckel någon gång användas till något annat som också
+signerar en hash, skulle en signatur kunna flyttas mellan de två sammanhangen.
+Domänsträngen knyter signaturen till att vara just ett audit-block i det här
+projektet. Det finns ett test som signerar över bara hashen och kontrollerar att
+det inte godtas.
+
+### Varför en signatur inte räcker
+
+En signatur i sig bevisar ingenting. Den som ändrar ett block kan signera om det
+med sin egen nyckel och skicka med sin egen publika nyckel, och då stämmer
+signaturen mot blocket. Verifieringen hade sagt ja.
+
+Skyddet ligger i att noden vet vilka publika nycklar som hör till gruppens
+noder. Ett block räknas som signerat först när signaturen kommer från en nyckel
+noden är konfigurerad att lita på. Det är den kontrollen som gör att en
+angripare inte kan skriva om ett block, och tas den bort faller fem tester.
+
+Nyckelringen ligger i `keyring.js` och inte som argument till `isChainValid()`.
+Skickades nycklarna in som argument skulle en anropare som glömde dem tysta hela
+signaturkontrollen, och den sortens misstag syns inte i en testkörning.
+
+### Genesis är osignerat
+
+Genesis byggs av koden på varje nod och har ingen som skapat det. Att kräva en
+signatur där skulle göra genesis olika på varje nod, och då kan noderna aldrig
+jämföra sina kedjor. Därför är genesis osignerat, och valideringen kräver
+uttryckligen att det är osignerat, så att ingen kan hänga på en egen signatur
+och få blocket att se granskat ut.
+
+### Nycklar
+
+Skapa ett nyckelpar:
+
+    npm run keys:generate --prefix server
+
+Kommandot skriver ut två rader att klistra in i projektets `.env`:
+
+    BLOCKCHAIN_PRIVATE_KEY=...
+    BLOCKCHAIN_TRUSTED_KEYS=...
+
+Den privata nyckeln signerar nodens egna block och får aldrig committas eller
+delas. `.env` är gitignorerad, och nycklarna sparas inte till någon fil av
+scriptet.
+
+`BLOCKCHAIN_TRUSTED_KEYS` är de publika nycklar noden accepterar block från,
+separerade med komma. Nodens egen nyckel är alltid betrodd hos sig själv, annars
+skulle noden inte kunna validera sin egen kedja.
+
+Kör man båda noderna lokalt från samma `.env` delar de nyckel och synkar direkt.
+Ska varje nod ha sin egen privata nyckel listar man allas publika nycklar i
+`BLOCKCHAIN_TRUSTED_KEYS` hos varje nod.
+
+Saknas `BLOCKCHAIN_PRIVATE_KEY` startar noden ändå, men med ett tillfälligt
+nyckelpar som försvinner vid omstart. Den kan då validera sin egen kedja men
+avvisar block från andra noder, och det loggas vid start.
 
 ## Synk mellan noder
 
@@ -140,12 +224,25 @@ den lokala bara om den inkommande är **giltig och längre**. Kedjan återskapas
 först till riktiga `Block`-objekt med `Blockchain.fromJSON()`, eftersom en
 kedja som kommit via JSON bara innehåller vanliga objekt utan metoder.
 
-`Block.fromJSON()` behåller den medskickade hashen i stället för att räkna om
-den. Räknade den om hashen skulle varje manipulerat block bli giltigt i samma
-stund som det togs emot.
+`Block.fromJSON()` behåller den medskickade hashen, signaturen och den publika
+nyckeln i stället för att räkna om eller sätta dem på nytt. Räknades hashen om
+skulle varje manipulerat block bli giltigt i samma stund som det togs emot, och
+signerades blocket om på vägen in skulle vi själva intyga något vi inte vet.
 
 `addReceivedBlock(plainBlock)` lägger till ett enskilt block från en annan nod,
 men bara om det passar direkt ovanpå kedjans sista block.
+
+`replaceChain()` tar en valfri `onReject`-funktion och lämnar skälet till ett
+avslag där. Skälet räknas alltså ut medan kedjan redan gås igenom, inte i
+efterhand. Räknades det ut efteråt skulle varje avvisad kedja valideras två gånger
+i stället för en, och en granne som skickar kedjor som alltid nekas skulle få oss
+att göra dubbelt arbete.
+
+En inkommande kedja får dessutom vara högst 10 000 block lång. Varje block kostar
+en hashomräkning och en signaturverifiering, och det arbetet är synkront. Utan tak
+kan den som får ansluta skicka en enorm kedja och låsa nodens event loop. Taket
+begränsar skadan men löser inte grundproblemet, som är att anslutningarna inte är
+autentiserade.
 
 Kedjor med exakt samma längd hanteras inte. Där behålls den lokala kedjan tills
 fork-hanteringen byggs.
@@ -165,8 +262,8 @@ databasen. Tanken är att Yamfus `auditLogger` senare ska kunna göra:
       timestamp: new Date().toISOString(),
     });
 
-Funktionen validerar audit-datat och lägger till ett block. Den är ännu inte
-inkopplad i någon route, det görs i AuditLogger-steget.
+Funktionen validerar audit-datat, lägger till ett block och signerar det.
+Backend anropar den via `server/src/services/auditLogger.js`.
 
 Rollen måste vara en av `DOCTOR`, `NURSE`, `CARE_CENTER`, `PATIENT` eller
 `UNAUTHORIZED`.
@@ -177,7 +274,8 @@ Från `server/`:
 
     node --test
 
-54 tester ska passera, inklusive P2P-testerna i `server/src/p2p/`.
+110 tester ska passera, inklusive P2P-testerna i `server/src/p2p/` och
+backendens route-tester.
 
 Kör inte `node --test src/blockchain/` med en katalog som argument. På Node 24
 rapporterar den varianten "pass 1" och returnerar 0 även när ett test faktiskt
@@ -209,16 +307,22 @@ valideringen slår till.
 - Skydd som avvisar okända fält, journaltext och fritext i tillåtna fält
 - `createAuditLog()` som gränssnitt mot backend
 - `replaceChain()`, `fromJSON()` och `addReceivedBlock()` för synk mellan noder
+- Ed25519-signering av varje audit-block
+- Verifiering mot en uppsättning betrodda publika nycklar
+- Skydd av kedjans sista block mot ändring med omräknad hash
 - Automatiska tester och demonstrationsscript
 
 ## Inte implementerat ännu
 
 Detta är kommande arbete och finns alltså inte i koden:
 
-- Public/private key-signering
-- Verifiering av digitala signaturer
 - Merkle Tree
 - Fork-hantering när två kedjor har exakt samma längd
-- Inkoppling mot backendens AuditLogger
 - Persistens; kedjan ligger i minnet och försvinner när servern stoppas
-- Skydd av kedjans sista block, se den kända begränsningen ovan
+- Nyckelrotation; byts nodens nyckel ut blir redan signerade block i kedjan
+  omöjliga att verifiera, vilket inte märks i dag eftersom kedjan ändå försvinner
+  vid omstart
+- Signaturen binder blocket till projektet men inte till en enskild driftmiljö.
+  Används samma privata nyckel i två separata uppsättningar noder kan en giltig
+  längre kedja från den ena tas emot av den andra. Så länge en nyckel bara finns i
+  en uppsättning är det inget problem, och nycklar ska inte delas mellan miljöer.
