@@ -51,9 +51,19 @@ async function startaNod(t, { peerUrls = [], antalBlock = 0, loggar } = {}) {
 
 // En rå klient som kan skicka precis vad som helst till en nod, för att testa
 // hur noden beter sig mot en granne som inte följer reglerna.
-function anslutSomKlient(t, port) {
+//
+// `förbered` får socketen innan den är ansluten, och där ska lyssnare på allt
+// noden skickar av sig själv registreras. Noden skickar REQUEST_CHAIN i samma
+// stund som en granne ansluter, och registreras lyssnaren först efter att den
+// här funktionen har returnerat kan eventet redan ha passerat. Det gav ett test
+// som gick igenom på en maskin och timeoutade på en annan.
+function anslutSomKlient(t, port, förbered) {
   const socket = connectToPeer(url(port), { transports: ['websocket'] });
   t.after(() => socket.disconnect());
+
+  if (förbered) {
+    förbered(socket);
+  }
 
   return new Promise((resolve) => { socket.on('connect', () => resolve(socket)); });
 }
@@ -263,12 +273,14 @@ test('ett block med otrodd signatur får oss inte att begära kedjan', async (t)
   block.signature = signHash(block.hash, angripare.privateKey);
   block.publicKey = angripare.publicKey;
 
-  const klient = await anslutSomKlient(t, node1.port);
-
+  // Lyssnaren måste finnas innan anslutningen är klar, eftersom noden ber om vår
+  // kedja i samma stund som vi ansluter.
   let antalBegäranden = 0;
-  klient.on(EVENTS.REQUEST_CHAIN, () => { antalBegäranden += 1; });
+  const klient = await anslutSomKlient(t, node1.port, (socket) => {
+    socket.on(EVENTS.REQUEST_CHAIN, () => { antalBegäranden += 1; });
+  });
 
-  // Noden ber om vår kedja så fort vi ansluter. Den begäran hör inte hit.
+  // Den första begäran hör till anslutningen och inte till blocket nedan.
   await väntaTills(() => antalBegäranden === 1, 'noden har bett om vår kedja');
 
   klient.emit(EVENTS.NEW_BLOCK, JSON.parse(JSON.stringify(block)));
