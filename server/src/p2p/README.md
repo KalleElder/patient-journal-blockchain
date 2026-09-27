@@ -46,6 +46,10 @@ Terminal 2:
 Noden startar även utan `PEER_URL` och kör då ensam. `PEER_URL` kan innehålla
 flera adresser separerade med komma om vi senare vill köra fler än två noder.
 
+Noderna behöver också nycklar för att acceptera varandras block. Kör man båda
+från samma `.env` delar de nyckel och synkar direkt, se avsnittet om nycklar i
+`server/src/blockchain/README.md`.
+
 Det gör inget att den ena noden startar först. Den loggar att grannen inte går
 att nå och Socket.io fortsätter försöka i bakgrunden.
 
@@ -66,24 +70,42 @@ startade först.
 
 ### När en hel kedja tas emot
 
-Den lokala kedjan byts bara ut om den inkommande är **giltig och längre**.
+Den lokala kedjan byts bara ut om den inkommande är **giltig och antingen längre
+eller en fork som vinner tiebreaken**.
 
 1. Är kedjan identisk med vår egen händer ingenting, noderna är redan i takt.
 2. Innehåller något block annat än audit-data avvisas kedjan.
-3. Är kedjan kortare eller lika lång behåller noden sin egen.
-4. Blocken återskapas som riktiga `Block`-objekt.
-5. `isChainValid()` körs på hela kedjan.
-6. Först då ersätts den lokala kedjan.
+3. Är kedjan kortare behåller noden sin egen.
+4. Är den lika lång avgör hashen på sista blocket, och den lägsta vinner.
+5. Blocken återskapas som riktiga `Block`-objekt.
+6. `isChainValid()` körs på hela kedjan.
+7. Först då ersätts den lokala kedjan.
 
-Två noder med olika kedjor av exakt samma längd är en fork. Där vinner den
-lokala kedjan tills vi bygger riktig fork-hantering, annars skulle noderna
-kunna skriva över varandra fram och tillbaka i all oändlighet.
+Två noder med olika kedjor av exakt samma längd är en fork. Eftersom regeln
+räknas fram ur kedjorna själva blir den densamma på båda noderna, så de landar på
+samma kedja i stället för att skriva över varandra fram och tillbaka. Tiebreaken
+gäller bara vid exakt samma längd, och en fork valideras precis som en längre
+kedja. Mer om det i `server/src/blockchain/README.md`.
+
+Loggen skiljer en fork från en kedja som bara är kortare, eftersom det är två
+olika situationer att felsöka.
+
+`isChainValid()` kontrollerar numera också att varje block är signerat av en
+nyckel noden litar på, se avsnittet om signering i
+`server/src/blockchain/README.md`. En kedja från en nod vars publika nyckel inte
+står i `BLOCKCHAIN_TRUSTED_KEYS` avvisas alltså även om den hashar helt korrekt.
+Loggen säger uttryckligen att det var signaturen, eftersom en felstavad
+nyckellista annars är omöjlig att skilja från en manipulerad kedja.
 
 ### När ett enskilt block tas emot
 
 Ett block läggs bara till om det passar direkt ovanpå nodens sista block.
 Gör det inte det ligger noderna isär, och då begär noden hela kedjan i stället
 för att gissa var blocket hör hemma.
+
+Är blocket signerat av en nyckel vi inte litar på begärs kedjan däremot inte,
+eftersom den skulle avvisas av exakt samma skäl. Utan den kontrollen skulle
+varje nytt block hos en nod med fel nyckel dra igång en hel kedjeöverföring.
 
 ## Blocken måste återskapas
 
@@ -152,15 +174,16 @@ Från `server/`:
 
     node --test
 
-54 tester ska passera, varav tolv startar riktiga Socket.io-noder. Testerna
+126 tester ska passera, varav tretton startar riktiga Socket.io-noder. Testerna
 lyssnar på port 0 och låter operativsystemet välja port, så de krockar varken
 med varandra eller med en server som körs samtidigt.
 
-Testerna täcker att en längre giltig kedja accepteras, att en kortare, lika
-lång, tom, manipulerad eller journaltext-bärande kedja nekas, att båda noderna
-använder samma genesis, att ett nytt audit-block synkas mellan två noder, att
-en nod som ligger efter hämtar hela kedjan, och att block som kommit över nätet
-är riktiga `Block`-objekt.
+Testerna täcker att en längre giltig kedja accepteras, att en kortare, tom,
+manipulerad eller journaltext-bärande kedja nekas, att en lika lång fork bara
+vinner när dess sista block har lägre hash och att båda noderna då landar på
+samma kedja, att båda noderna använder samma genesis, att ett nytt audit-block
+synkas mellan två noder, att en nod som ligger efter hämtar hela kedjan, och att
+block som kommit över nätet är riktiga `Block`-objekt.
 
 ## Tillfällig utvecklingsroute
 
@@ -184,7 +207,7 @@ Exempel:
 
 ## Implementerat
 
-- `replaceChain()` med longest-chain-regeln
+- `replaceChain()` med longest-chain-regeln och tiebreak vid samma längd
 - `Block.fromJSON()` och `Blockchain.fromJSON()` för mottagna kedjor
 - `addReceivedBlock()` för enskilda block
 - Socket.io-server och klient i varje nod
@@ -192,12 +215,12 @@ Exempel:
 - Utbyte av kedjor när noderna ansluter, åt båda hållen
 - Broadcast när noden själv skapar ett audit-block
 - Kontroll av att endast audit-data kommer in över nätet
+- Kontroll av att inkommande block är signerade av en betrodd nyckel
 - Loggar per nod och demonstrationsscript
 
 ## Inte implementerat ännu
 
-- Fork-hantering när två kedjor har exakt samma längd
-- Digital signering och verifiering av vem som skapade ett block
 - Merkle Tree
 - Persistens; kedjan ligger i minnet och försvinner när noden stoppas
-- Autentisering mellan noder, vem som helst kan i dag ansluta till en nod
+- Autentisering av själva anslutningen; vem som helst kan fortfarande ansluta och
+  begära vår kedja, även om de inte längre kan få in egna block i den

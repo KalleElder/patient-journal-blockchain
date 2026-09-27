@@ -6,6 +6,16 @@ const Block = require('./Block');
 const GENESIS_TIMESTAMP = '2026-09-01T00:00:00.000Z';
 const GENESIS_DATA = { action: 'GENESIS' };
 
+// Tak på hur lång en inkommande kedja får vara. Varje block i en kedja som tas
+// emot kostar en hashomräkning och en signaturverifiering, och det arbetet är
+// synkront. Utan tak kan vem som helst som får ansluta skicka en enorm kedja och
+// låsa nodens event loop medan den räknar. Taket är långt över allt vi kommer i
+// närheten av, men bundet.
+//
+// Det är en begränsning av skadan, inte en lösning. Den riktiga lösningen är att
+// autentisera vilka noder som får ansluta, se server/src/p2p/README.md.
+const MAX_KEDJELÄNGD = 10000;
+
 class Blockchain {
   constructor() {
     this.chain = [Blockchain.createGenesisBlock()];
@@ -24,7 +34,9 @@ class Blockchain {
   // Socket.io. Returnerar null om något block inte går att återskapa, så att
   // skräpdata stoppas här i stället för att krascha valideringen längre fram.
   static fromJSON(plainChain) {
-    if (!Array.isArray(plainChain) || plainChain.length === 0) {
+    if (!Array.isArray(plainChain)
+      || plainChain.length === 0
+      || plainChain.length > MAX_KEDJELÄNGD) {
       return null;
     }
 
@@ -59,6 +71,7 @@ class Blockchain {
       previousHash: previousBlock.hash,
     });
 
+    block.sign();
     this.chain.push(block);
     return block;
   }
@@ -79,11 +92,25 @@ class Blockchain {
       return false;
     }
 
+    // Genesis byggs av koden på varje nod och har ingen som skapat det. Kravet
+    // att det är osignerat gör att ingen kan hänga på en egen signatur där och
+    // få den att se granskad ut. Alla andra block måste tvärtom vara signerade,
+    // vilket kontrolleras i loopen nedan.
+    if (genesis.signature !== null || genesis.publicKey !== null) {
+      return false;
+    }
+
     for (let i = 1; i < this.chain.length; i += 1) {
       const block = this.chain[i];
       const previousBlock = this.chain[i - 1];
 
       if (!block.hasValidHash()) {
+        return false;
+      }
+
+      // Signaturen är det enda som skyddar kedjans sista block, eftersom det
+      // inte har någon efterföljare vars previousHash kan avslöja en ändring.
+      if (!block.hasValidSignature()) {
         return false;
       }
 
@@ -100,26 +127,63 @@ class Blockchain {
   }
 
   // Tar emot en kedja från en annan nod. Den lokala kedjan byts bara ut om den
-  // inkommande är både längre och giltig. Är den kortare, lika lång, trasig
-  // eller manipulerad behåller noden sin egen kedja.
+  // inkommande är giltig och antingen längre, eller lika lång och vinnare av
+  // tiebreaken nedan. Är den kortare, trasig eller manipulerad behåller noden
+  // sin egen kedja.
   //
-  // Att två noder har olika kedjor med exakt samma längd hanteras inte här.
-  // Då vinner den lokala kedjan tills vi bygger riktig fork-hantering.
-  replaceChain(receivedChain) {
+  // onReject är valfri och får skälet till avslaget, så att den som anropar kan
+  // logga något begripligt. Skälet lämnas här i stället för att räknas ut i
+  // efterhand, eftersom en granne då hade kunnat få oss att validera samma kedja
+  // flera gånger genom att skicka kedjor som alltid nekas.
+  replaceChain(receivedChain, { onReject } = {}) {
+    const avslå = (orsak) => {
+      if (onReject) {
+        onReject(orsak);
+      }
+
+      return false;
+    };
+
     const candidate = Blockchain.fromJSON(receivedChain);
 
     if (!candidate) {
-      return false;
+      return avslå('gick inte att läsa som en kedja');
     }
 
-    if (candidate.chain.length <= this.chain.length) {
-      return false;
+    if (candidate.chain.length < this.chain.length) {
+      return avslå('kortare än vår egen');
+    }
+
+    // Två giltiga kedjor med exakt samma längd är en fork, och då avgör hashen
+    // på sista blocket. Lägst hash vinner. Regeln räknas fram ur kedjorna själva
+    // och blir därför densamma på båda noderna, så de landar på samma kedja i
+    // stället för att skriva över varandra fram och tillbaka. Är hasharna lika
+    // är det redan samma kedja och det finns inget att byta till.
+    //
+    // Jämförelsen sker på en hash som ännu inte är verifierad, så en granne kan
+    // hitta på ett lågt värde för att vinna. Det ger ingenting, eftersom
+    // isChainValid() nedan ändå kräver att hashen stämmer med blockets innehåll
+    // och att signaturen är gjord över just den hashen. Längdkravet ovan ligger
+    // kvar oförändrat: en kortare kedja vinner aldrig, hur låg hashen än är.
+    if (candidate.chain.length === this.chain.length
+      && candidate.getLatestBlock().hash >= this.getLatestBlock().hash) {
+      return avslå('lika lång fork som inte vinner på hash');
     }
 
     // Valideras som en hel kedja, vilket också kontrollerar att den andra
-    // noden utgår från samma genesis-block som vi.
+    // noden utgår från samma genesis-block som vi och att varje block är
+    // signerat av en nyckel vi litar på.
     if (!candidate.isChainValid()) {
-      return false;
+      // En kedja som avvisas för att vi inte litar på nyckeln ser annars
+      // identisk ut med en manipulerad kedja, och då är en felstavad
+      // BLOCKCHAIN_TRUSTED_KEYS omöjlig att felsöka.
+      const okändNyckel = candidate.chain
+        .slice(1)
+        .some((block) => !block.hasValidSignature());
+
+      return avslå(okändNyckel
+        ? 'signerad av en nyckel vi inte litar på, se BLOCKCHAIN_TRUSTED_KEYS'
+        : 'ogiltig kedja');
     }
 
     this.chain = candidate.chain;
@@ -142,7 +206,7 @@ class Blockchain {
       return false;
     }
 
-    if (!block.hasValidHash()) {
+    if (!block.hasValidHash() || !block.hasValidSignature()) {
       return false;
     }
 

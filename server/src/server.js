@@ -8,11 +8,17 @@ if (!process.env.JWT_SECRET) {
 }
 
 const app = require('./app');
-const { getAuditChain, setNewBlockListener } = require('./blockchain');
+const {
+  getAuditChain, setNewBlockListener, configureSigningFromEnv,
+} = require('./blockchain');
 const { createP2PNode } = require('./p2p/p2pServer');
 const registerDevAuditRoutes = require('./p2p/devAuditRoutes');
 
 const port = process.env.PORT || 3001;
+
+// Läses in före första audit-blocket. Saknas nyckeln startar noden ändå, men
+// med ett tillfälligt nyckelpar, och då loggas det tydligt.
+configureSigningFromEnv(process.env, (meddelande) => console.log(`[NODE ${port}] ${meddelande}`));
 
 // PEER_URL kan innehålla flera adresser separerade med komma. Är den tom
 // startar noden ensam, precis som tidigare.

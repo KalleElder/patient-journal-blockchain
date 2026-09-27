@@ -28,6 +28,61 @@ function kedjaMed(antalBlock) {
   return blockchain;
 }
 
+// Två kedjor som är lika långa men har olika innehåll är en fork. Märket går in
+// i data, så hasharna skiljer sig även om båda kedjorna byggs i samma
+// millisekund och därmed får samma timestamp.
+function forkMed(antalBlock, märke) {
+  const blockchain = new Blockchain();
+
+  for (let i = 0; i < antalBlock; i += 1) {
+    blockchain.addBlock({ ...auditEvent, userId: i + 1, patientId: märke });
+  }
+
+  return blockchain;
+}
+
+// Två forkar av samma längd, den med lägst hash på sista blocket först. Vilken
+// av dem som vinner går inte att veta i förväg, eftersom hashen följer av
+// innehållet.
+function sorteradeForkar(antalBlock) {
+  const a = forkMed(antalBlock, 7);
+  const b = forkMed(antalBlock, 8);
+
+  return a.getLatestBlock().hash < b.getLatestBlock().hash ? [a, b] : [b, a];
+}
+
+// Bygger en fork vars sista block hamnar på rätt sida av en given hash. Behövs
+// när ett test ska avgöras av valideringen och inte av tiebreaken, alltså när
+// kandidaten måste vinna hash-jämförelsen för att testet ska bevisa något.
+function forkMedHash(antalBlock, duger) {
+  for (let märke = 1; märke <= 200; märke += 1) {
+    const kandidat = forkMed(antalBlock, märke);
+
+    if (duger(kandidat.getLatestBlock().hash)) {
+      return kandidat;
+    }
+  }
+
+  throw new Error('hittade ingen fork med den hash testet behöver');
+}
+
+// Ändrar ett block och signerar om det med den nyckel noden litar på, alltså som
+// om någon med nodens egen nyckel skrev om historiken. Då stämmer både hashen
+// och signaturen, och varken hash- eller signaturkontrollen fångar något.
+// previousHash-länken och index är det enda som återstår, och det är just de
+// kontrollerna som annars aldrig prövas: en angripare utan betrodd nyckel stoppas
+// alltid av signaturen först.
+function signeraOmMedBetroddNyckel(plainBlock) {
+  const block = Block.fromJSON(plainBlock);
+
+  block.hash = block.calculateHash();
+  block.sign();
+
+  plainBlock.hash = block.hash;
+  plainBlock.signature = block.signature;
+  plainBlock.publicKey = block.publicKey;
+}
+
 test('en längre giltig kedja accepteras', () => {
   const node1 = kedjaMed(2);
   const node2 = new Blockchain();
@@ -47,16 +102,219 @@ test('en kortare kedja nekas och den lokala kedjan behålls', () => {
   assert.strictEqual(node2.getLatestBlock().hash, eget);
 });
 
-// Lika lång kedja räknas som en fork. Tills vi bygger fork-hantering vinner
-// alltid den lokala kedjan, annars skulle noderna kunna skriva över varandra
-// fram och tillbaka i all oändlighet.
-test('en lika lång kedja nekas', () => {
-  const node1 = kedjaMed(2);
-  const node2 = kedjaMed(2);
-  const eget = node2.getLatestBlock().hash;
+// Två giltiga kedjor med exakt samma längd är en fork. Där avgör hashen på
+// sista blocket och den lägsta vinner.
+test('en lika lång fork med lägre hash på sista blocket ersätter den lokala kedjan', () => {
+  const [lägre, högre] = sorteradeForkar(2);
+  const vinnande = lägre.getLatestBlock().hash;
 
-  assert.strictEqual(node2.replaceChain(node1.chain), false);
-  assert.strictEqual(node2.getLatestBlock().hash, eget);
+  assert.strictEqual(högre.replaceChain(överNätet(lägre.chain)), true);
+  assert.strictEqual(högre.chain.length, 3);
+  assert.strictEqual(högre.getLatestBlock().hash, vinnande);
+  assert.strictEqual(högre.isChainValid(), true);
+});
+
+test('en lika lång fork med högre hash på sista blocket nekas', () => {
+  const [lägre, högre] = sorteradeForkar(2);
+  const eget = lägre.getLatestBlock().hash;
+
+  assert.strictEqual(lägre.replaceChain(överNätet(högre.chain)), false);
+  assert.strictEqual(lägre.chain.length, 3);
+  assert.strictEqual(lägre.getLatestBlock().hash, eget);
+});
+
+// Samma kedja tillbaka är ingen fork. Byttes den ut skulle två noder kunna
+// skicka samma kedja mellan sig i all oändlighet.
+test('en identisk kedja nekas', () => {
+  const nod = forkMed(2, 7);
+  const eget = nod.getLatestBlock().hash;
+
+  assert.strictEqual(nod.replaceChain(överNätet(nod.chain)), false);
+  assert.strictEqual(nod.chain.length, 3);
+  assert.strictEqual(nod.getLatestBlock().hash, eget);
+});
+
+// Hela poängen med en tiebreak: utfallet får inte bero på vem som hann skicka
+// först, annars konvergerar noderna aldrig.
+test('båda noderna hamnar på samma kedja när en fork utbyts i båda riktningar', () => {
+  const [lägre, högre] = sorteradeForkar(2);
+  const vinnande = lägre.getLatestBlock().hash;
+
+  högre.replaceChain(överNätet(lägre.chain));
+  lägre.replaceChain(överNätet(högre.chain));
+
+  assert.strictEqual(lägre.getLatestBlock().hash, vinnande);
+  assert.strictEqual(högre.getLatestBlock().hash, vinnande);
+});
+
+// Tiebreaken gäller bara vid exakt samma längd. Vinner en kortare kedja på en
+// låg hash kan en granne skriva om vår historik med en kedja som är sämre än
+// den vi redan har.
+test('en kortare kedja nekas även när dess sista block har lägre hash', () => {
+  const vår = kedjaMed(4);
+  const eget = vår.getLatestBlock().hash;
+  const kortare = forkMedHash(2, (hash) => hash < eget);
+
+  assert.strictEqual(vår.replaceChain(överNätet(kortare.chain)), false);
+  assert.strictEqual(vår.chain.length, 5);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// P2P-lagret loggar skälet, och då ska en fork gå att skilja från en kedja som
+// bara är kortare. Det är två helt olika situationer att felsöka.
+test('replaceChain skiljer en fork från en kortare kedja i avslagsskälet', () => {
+  const [lägre, högre] = sorteradeForkar(2);
+  const skäl = [];
+  const onReject = (orsak) => skäl.push(orsak);
+
+  lägre.replaceChain(överNätet(högre.chain), { onReject });
+  lägre.replaceChain(överNätet(new Blockchain().chain), { onReject });
+
+  assert.match(skäl[0], /lika lång fork/);
+  assert.match(skäl[1], /kortare än vår egen/);
+});
+
+// En granne kan sätta vilken hash som helst på sitt sista block och därmed
+// vinna jämförelsen. Det ska inte ge något, eftersom hashen kontrolleras mot
+// blockets innehåll efteråt.
+test('en lika lång fork med påhittat låg hash på sista blocket nekas', () => {
+  const angripare = forkMed(2, 7);
+  const vår = forkMed(2, 8);
+  const eget = vår.getLatestBlock().hash;
+
+  const skickad = överNätet(angripare.chain);
+  skickad[2].hash = '0'.repeat(64);
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// En fork som vinner tiebreaken går igenom exakt samma validering som en längre
+// kedja. Först den vanligaste manipulationen, där innehållet ändras och den
+// gamla hashen ligger kvar.
+test('en lika lång fork som vinner på hash nekas när data har ändrats', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[2].data.userId = 99;
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// Sedan den smartare varianten, där hashen räknas om så att blocket ser giltigt
+// ut. Då pekar nästa block fortfarande på den gamla hashen och länken brister.
+test('en lika lång fork som vinner på hash nekas när data ändrats och hashen räknats om', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[2].data.userId = 99;
+  skickad[2].hash = Block.fromJSON(skickad[2]).calculateHash();
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// Sista blocket avgör tiebreaken och är därmed det enda block en angripare
+// tjänar något på att räkna om. Det får inte komma undan med färre kontroller
+// än blocken före, som skyddas av nästa blocks previousHash.
+test('en lika lång fork nekas när sista blockets data ändrats och hashen ligger kvar', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[3].data.userId = 99;
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+test('en lika lång fork nekas när sista blockets data ändrats och hashen räknats om', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[3].data.userId = 99;
+  skickad[3].hash = Block.fromJSON(skickad[3]).calculateHash();
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// Med signering på plats stoppas en vanlig angripare alltid av signaturen, och
+// då hinner previousHash-kontrollen aldrig säga något. Den behövs mot den som
+// har en nyckel vi litar på, till exempel en komprometterad nod, och först då
+// syns det om länken faktiskt kontrolleras.
+test('en lika lång fork nekas när ett block ändrats och signerats om med betrodd nyckel', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[2].data.userId = 99;
+  signeraOmMedBetroddNyckel(skickad[2]);
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  // Blocket hashar och signerar korrekt. Bara den brutna länken till nästa
+  // block avslöjar det.
+  assert.strictEqual(Block.fromJSON(skickad[2]).hasValidHash(), true);
+  assert.strictEqual(Block.fromJSON(skickad[2]).hasValidSignature(), true);
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// Sista blocket har ingen efterföljare vars previousHash kan avslöja en ändring,
+// så det är där en felaktig länk lättast slinker igenom.
+test('en lika lång fork nekas när sista blockets previousHash ändrats och signerats om', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[3].previousHash = 'a'.repeat(64);
+  signeraOmMedBetroddNyckel(skickad[3]);
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// Index är det sista som håller kedjan i ordning när både hash, signatur och
+// länk stämmer. Sista blocket är enda stället där ett ändrat index inte redan
+// fångas av nästa blocks previousHash.
+test('en lika lång fork nekas när sista blockets index ändrats och signerats om', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[3].index = 7;
+  signeraOmMedBetroddNyckel(skickad[3]);
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
+});
+
+// Samma lucka i den längre kedjans väg, där ingen tiebreak är inblandad.
+test('en längre kedja nekas när sista blockets index ändrats och signerats om', () => {
+  const skickad = överNätet(kedjaMed(3).chain);
+  skickad[3].index = 7;
+  signeraOmMedBetroddNyckel(skickad[3]);
+
+  const vår = new Blockchain();
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.chain.length, 1);
+});
+
+// Genesis saknar föregående block att jämföras mot och glöms därför lättast.
+test('en lika lång fork med manipulerat genesis block nekas', () => {
+  const skickad = överNätet(forkMed(3, 7).chain);
+  skickad[0].data.action = 'FEJKAD_GENESIS';
+
+  const vår = forkMedHash(3, (hash) => hash > skickad[3].hash);
+  const eget = vår.getLatestBlock().hash;
+
+  assert.strictEqual(vår.replaceChain(skickad), false);
+  assert.strictEqual(vår.getLatestBlock().hash, eget);
 });
 
 test('en tom kedja nekas', () => {

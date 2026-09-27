@@ -1,7 +1,7 @@
 const { Server } = require('socket.io');
 const { io: connectToPeer } = require('socket.io-client');
 
-const Blockchain = require('../blockchain/Blockchain');
+const Block = require('../blockchain/Block');
 const { isAuditData } = require('../blockchain/auditLog');
 
 // Tre händelser räcker för den här delen:
@@ -64,21 +64,17 @@ function createP2PNode({
       return;
     }
 
-    if (blockchain.replaceChain(mottagen)) {
+    // Skälet till ett avslag kommer från replaceChain, som redan har gått
+    // igenom kedjan. Att räkna ut det här i efterhand skulle betyda att en
+    // granne kunde få oss att validera samma kedja flera gånger.
+    const avslå = (orsak) => skriv(
+      `Chain rejected (${orsak}), behåller lokal kedja med ${blockchain.chain.length} block`,
+    );
+
+    if (blockchain.replaceChain(mottagen, { onReject: avslå })) {
       skriv('Chain valid');
       skriv(`Chain replaced (${blockchain.chain.length} block)`);
-      return;
     }
-
-    // Kedjan förkastades. Vi tar reda på varför enbart för loggens skull, så
-    // att det syns om det handlar om en manipulerad kedja eller bara en
-    // kortare. Beslutet är redan fattat av replaceChain.
-    const kandidat = Blockchain.fromJSON(mottagen);
-    const orsak = kandidat && kandidat.isChainValid()
-      ? 'inte längre än vår egen'
-      : 'ogiltig kedja';
-
-    skriv(`Chain rejected (${orsak}), behåller lokal kedja med ${blockchain.chain.length} block`);
   }
 
   function taEmotBlock(plainBlock, socket) {
@@ -97,6 +93,16 @@ function createP2PNode({
 
     if (blockchain.addReceivedBlock(plainBlock)) {
       skriv(`Block added (kedjan har ${blockchain.chain.length} block)`);
+      return;
+    }
+
+    // Litar vi inte på signaturen hjälper det inte att begära hela kedjan,
+    // den kommer att avvisas av exakt samma skäl. Utan den här kontrollen
+    // skulle varje nytt block hos grannen dra igång en hel kedjeöverföring.
+    const block = Block.fromJSON(plainBlock);
+
+    if (!block || !block.hasValidSignature()) {
+      skriv('Block rejected (signatur vi inte litar på), begär inte kedjan');
       return;
     }
 

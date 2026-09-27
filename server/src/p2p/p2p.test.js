@@ -5,6 +5,7 @@ const { io: connectToPeer } = require('socket.io-client');
 
 const Block = require('../blockchain/Block');
 const Blockchain = require('../blockchain/Blockchain');
+const { generateKeyPair, signHash } = require('../blockchain/signing');
 const { createP2PNode, EVENTS } = require('./p2pServer');
 
 const auditEvent = Object.freeze({
@@ -50,9 +51,19 @@ async function startaNod(t, { peerUrls = [], antalBlock = 0, loggar } = {}) {
 
 // En rå klient som kan skicka precis vad som helst till en nod, för att testa
 // hur noden beter sig mot en granne som inte följer reglerna.
-function anslutSomKlient(t, port) {
+//
+// `förbered` får socketen innan den är ansluten, och där ska lyssnare på allt
+// noden skickar av sig själv registreras. Noden skickar REQUEST_CHAIN i samma
+// stund som en granne ansluter, och registreras lyssnaren först efter att den
+// här funktionen har returnerat kan eventet redan ha passerat. Det gav ett test
+// som gick igenom på en maskin och timeoutade på en annan.
+function anslutSomKlient(t, port, förbered) {
   const socket = connectToPeer(url(port), { transports: ['websocket'] });
   t.after(() => socket.disconnect());
+
+  if (förbered) {
+    förbered(socket);
+  }
 
   return new Promise((resolve) => { socket.on('connect', () => resolve(socket)); });
 }
@@ -241,6 +252,43 @@ test('en nod som ligger efter hämtar hela kedjan när ett block inte passar', a
 
   assert.strictEqual(node2.blockchain.getLatestBlock().hash, node1.blockchain.getLatestBlock().hash);
   assert.strictEqual(node2.blockchain.isChainValid(), true);
+});
+
+// Motsatsen till testet ovan. Ett block som inte passar ovanpå vår kedja, men
+// som är signerat av en nyckel vi inte litar på, ska inte få oss att hämta hela
+// kedjan. Den kedjan skulle avvisas av exakt samma skäl, så begäran är bara
+// arbete som en granne kan beställa gratis.
+test('ett block med otrodd signatur får oss inte att begära kedjan', async (t) => {
+  const node1 = await startaNod(t, { antalBlock: 1 });
+  const angripare = generateKeyPair();
+
+  // Index 3 ligger för långt fram, så blocket passar inte sist i kedjan och
+  // noden skulle annars vilja hämta hela kedjan för att komma i takt.
+  const block = new Block({
+    index: 3,
+    timestamp: '2026-09-27T12:00:00.000Z',
+    data: auditEvent,
+    previousHash: 'a'.repeat(64),
+  });
+  block.signature = signHash(block.hash, angripare.privateKey);
+  block.publicKey = angripare.publicKey;
+
+  // Lyssnaren måste finnas innan anslutningen är klar, eftersom noden ber om vår
+  // kedja i samma stund som vi ansluter.
+  let antalBegäranden = 0;
+  const klient = await anslutSomKlient(t, node1.port, (socket) => {
+    socket.on(EVENTS.REQUEST_CHAIN, () => { antalBegäranden += 1; });
+  });
+
+  // Den första begäran hör till anslutningen och inte till blocket nedan.
+  await väntaTills(() => antalBegäranden === 1, 'noden har bett om vår kedja');
+
+  klient.emit(EVENTS.NEW_BLOCK, JSON.parse(JSON.stringify(block)));
+
+  await paus();
+
+  assert.strictEqual(antalBegäranden, 1);
+  assert.strictEqual(node1.blockchain.chain.length, 2);
 });
 
 test('ett manipulerat enskilt block nekas över nätet', async (t) => {

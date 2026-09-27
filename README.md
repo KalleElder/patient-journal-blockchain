@@ -333,11 +333,23 @@ Följande är implementerat:
 - access logs med `userId`, `patientId`, `role`, `action` och `timestamp`
 - validering som hindrar journaltext och otillåtna fält från att lagras i
   blockchain
+- Ed25519-signering av varje audit-block
+- verifiering mot de publika nycklar noden är konfigurerad att lita på
 
 Medicinsk journaltext lagras i SQL och ska aldrig lagras i blockchain.
 
 Blockchainen ligger för närvarande i minnet och återställs vid omstart av
 servern.
+
+Signeringen gör att ett block som ändras och hashas om inte längre går igenom
+valideringen, inte heller kedjans sista block. Att ett sista block tas bort helt
+fångas däremot inte av valideringen ensam. Där är det P2P-synken mot en nod med
+längre kedja som upptäcker det.
+
+Nycklar skapas med `npm run keys:generate --prefix server` och läggs i `.env`.
+Den privata nyckeln committas aldrig.
+
+Mer information finns i `server/src/blockchain/README.md`.
 
 ### P2P mellan servernoder
 
@@ -351,7 +363,9 @@ Följande finns på `main`:
 - utbyte av blockchain vid anslutning
 - broadcast av nya audit-block
 - validering av mottagen blockchain-data
+- kontroll av att inkommande block är signerade av en betrodd nyckel
 - `replaceChain()` som accepterar en giltig längre kedja
+- fork-hantering när två kedjor är lika långa, där lägst hash på sista blocket vinner
 - synkronisering av audit-block mellan noder
 
 Exempel på två noder:
@@ -359,7 +373,14 @@ Exempel på två noder:
     PORT=3001 PEER_URL=http://localhost:3002 npm start --prefix server
     PORT=3002 PEER_URL=http://localhost:3001 npm start --prefix server
 
-Kedjor med samma längd har ännu ingen färdig fork-hantering.
+Noderna behöver dela nycklar för att acceptera varandras block. Kör man dem från
+samma `.env` fungerar det direkt.
+
+Är två kedjor exakt lika långa avgörs valet av hashen på sista blocket, och den
+lägsta vinner. Båda noderna räknar fram samma svar och landar därför på samma
+kedja. En kortare kedja avvisas fortfarande direkt.
+
+Mer information finns i `server/src/p2p/README.md`.
 
 ### Verifierat end-to-end-test
 
@@ -385,10 +406,10 @@ Serverns testsvit körs från projektroten med:
 
     npm run test:server
 
-Senaste verifieringen från `main`:
+Senaste körningen av testsviten:
 
-- 85 tester
-- 85 godkända
+- 126 tester
+- 126 godkända
 - 0 misslyckade
 
 Frontend har dessutom verifierats med:
@@ -404,9 +425,7 @@ Följande delar återstår eller behöver slutverifieras:
 
 - frontendvy för access logs
 - Socket.io-klient för liveuppdateringar i frontend
-- digital signering om den ingår i slutversionen
-- Merkle Tree om det ingår i slutversionen
-- fork-hantering för kedjor med samma längd om den ingår i slutversionen
+- Merkle Tree
 - verification badge om den ingår i slutversionen
 - clean-clone installationstest
 - slutliga screenshots till README

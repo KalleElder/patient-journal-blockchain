@@ -202,7 +202,11 @@ test('två olika datum ger olika hash', () => {
 // efterföljare. Det löses av signering och P2P-synkronisering, som är kommande
 // arbete. Testet finns för att begränsningen ska vara synlig och för att falla
 // när skyddet väl byggs.
-test('KÄND BEGRÄNSNING: sista blocket är ännu inte skyddat mot omräknad hash', () => {
+// Det här var tidigare en dokumenterad begränsning. Sista blocket har ingen
+// efterföljare vars previousHash kan avslöja en ändring, så en omräknad hash
+// gick igenom. Signeringen stänger hålet: den nya hashen täcks inte av den
+// gamla signaturen, och för att signera om krävs en betrodd privat nyckel.
+test('sista blocket med ändrad data och omräknad hash upptäcks', () => {
   const blockchain = new Blockchain();
   blockchain.addBlock(auditEvent);
 
@@ -210,7 +214,32 @@ test('KÄND BEGRÄNSNING: sista blocket är ännu inte skyddat mot omräknad has
   last.data.patientId = 8;
   last.hash = last.calculateHash();
 
+  assert.strictEqual(blockchain.isChainValid(), false);
+});
+
+// Samma manipulation men utan omräkning. Det är två olika buggar att skydda
+// mot, och båda ska fångas även på kedjans sista block.
+test('sista blocket med ändrad data och kvarlämnad hash upptäcks', () => {
+  const blockchain = new Blockchain();
+  blockchain.addBlock(auditEvent);
+
+  blockchain.getLatestBlock().data.patientId = 8;
+
+  assert.strictEqual(blockchain.isChainValid(), false);
+});
+
+// Att ta bort sista blocket upptäcks fortfarande inte av valideringen ensam.
+// En hashkedja kan inte se vad den inte längre har. Det som räddar oss är
+// P2P-synken: noden får en kortare kedja än grannen och får den ersatt.
+test('en kedja med borttaget sista block är i sig giltig, men kortare', () => {
+  const blockchain = new Blockchain();
+  blockchain.addBlock(auditEvent);
+  blockchain.addBlock({ ...auditEvent, userId: 2 });
+
+  blockchain.chain.pop();
+
   assert.strictEqual(blockchain.isChainValid(), true);
+  assert.strictEqual(blockchain.chain.length, 2);
 });
 
 test('samma innehåll ger samma hash oavsett nyckelordning', () => {
