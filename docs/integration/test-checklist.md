@@ -15,8 +15,8 @@ tillsammans med gruppen.
 - [ ] SQL-databasen går att skapa från projektets SQL-filer
 - [ ] Testdata går att lägga in
 - [ ] Frontend går att starta
-- [ ] Backend går att starta
-- [ ] Två servernoder går att starta samtidigt
+- [x] Backend går att starta
+- [x] Två servernoder går att starta samtidigt
 
 ## 2. Git och projektstruktur
 
@@ -34,8 +34,8 @@ tillsammans med gruppen.
 - [ ] Giltig användare kan logga in
 - [ ] Felaktiga uppgifter nekas
 - [ ] Inloggad användares roll identifieras
-- [ ] Backend verifierar authentication
-- [ ] Skyddade API-routes kan inte användas utan giltig authentication
+- [x] Backend verifierar authentication
+- [x] Skyddade API-routes kan inte användas utan giltig authentication
 
 ## 4. Roller
 
@@ -59,13 +59,13 @@ För varje roll ska vi kontrollera att rätt information och funktioner visas.
 
 ## 6. Journal
 
-- [ ] Journalanteckningar hämtas från SQL
-- [ ] Medicinsk journaltext finns inte i blockchain
-- [ ] Behörig användare kan läsa journal
-- [ ] Behörig användare kan skapa journalanteckning
-- [ ] Journalanteckningen sparas i SQL
-- [ ] Journalanteckning visar korrekt författare
-- [ ] Journalanteckning visar korrekt tidpunkt
+- [x] Journalanteckningar hämtas från SQL
+- [x] Medicinsk journaltext finns inte i blockchain
+- [x] Behörig användare kan läsa journal
+- [x] Behörig användare kan skapa journalanteckning
+- [x] Journalanteckningen sparas i SQL
+- [x] Journalanteckning visar korrekt författare
+- [x] Journalanteckning visar korrekt tidpunkt
 
 ## 7. Journal visibility
 
@@ -88,23 +88,23 @@ Kontrollera varje nivå med flera olika roller.
 
 Vid relevant journalåtkomst:
 
-- [ ] Audit event skapas
-- [ ] userId är korrekt
-- [ ] patientId är korrekt
-- [ ] role är korrekt
-- [ ] action är korrekt
-- [ ] timestamp finns
-- [ ] Journaltext finns INTE i audit-eventet
+- [x] Audit event skapas
+- [x] userId är korrekt
+- [x] patientId är korrekt
+- [x] role är korrekt
+- [x] action är korrekt
+- [x] timestamp finns
+- [x] Journaltext finns INTE i audit-eventet
 
 ## 10. Blockchain
 
-- [ ] Genesis block fungerar
-- [ ] Nya block kan skapas
-- [ ] Varje block har hash
-- [ ] Block länkas med previousHash
-- [ ] Kedjan kan valideras
-- [ ] Manipulerad kedja upptäcks
-- [ ] Access logs går att läsa från blockchain
+- [x] Genesis block fungerar
+- [x] Nya block kan skapas
+- [x] Varje block har hash
+- [x] Block länkas med previousHash
+- [x] Kedjan kan valideras
+- [x] Manipulerad kedja upptäcks
+- [x] Access logs går att läsa från blockchain
 
 ## 11. Digital signering
 
@@ -126,11 +126,11 @@ Exempel:
 
 Kontrollera:
 
-- [ ] Båda noderna kan köras samtidigt
-- [ ] Noderna kan ansluta till varandra
-- [ ] Node 1 kan skicka relevant information till Node 2
-- [ ] Node 2 kan skicka relevant information till Node 1
-- [ ] Blockchain-information kan synkroniseras
+- [x] Båda noderna kan köras samtidigt
+- [x] Noderna kan ansluta till varandra
+- [x] Node 1 kan skicka relevant information till Node 2
+- [x] Node 2 kan skicka relevant information till Node 1
+- [x] Blockchain-information kan synkroniseras
 - [ ] Dubbletter eller felaktiga block hanteras
 
 ## 13. Journal mellan noder
@@ -146,18 +146,43 @@ Testscenario:
 
 Förväntat resultat:
 
-- [ ] Journalanteckningen går att läsa via Node 2
-- [ ] Behörighetsreglerna gäller även via Node 2
-- [ ] Relevant access log finns i blockchain
-- [ ] Blockchain-noderna är synkroniserade
+- [x] Journalanteckningen går att läsa via Node 2
+- [x] Behörighetsreglerna gäller även via Node 2
+- [x] Relevant access log finns i blockchain
+- [x] Blockchain-noderna är synkroniserade
+
+## Verifierat integrationstest 2026-09-25
+
+Kalle genomförde ett manuellt end-to-end-test från aktuell `main` med två
+samtidiga servernoder på port 3001 och 3002.
+
+Verifierat flöde:
+
+1. Node 1 startades på port 3001 med Node 2 som peer.
+2. Node 2 startades på port 3002 med Node 1 som peer.
+3. Noderna anslöt via Socket.io och rapporterade synkroniserade kedjor.
+4. `doctor1` loggade in via Node 1 och fick en giltig JWT.
+5. En journalanteckning skapades via Node 1 och API:t svarade HTTP 201.
+6. Samma journalanteckning lästes via Node 2 och API:t svarade HTTP 200.
+7. Access-loggen innehöll `CREATE_JOURNAL_ENTRY` och `READ_JOURNAL`.
+8. Båda blockkedjorna hade samma längd och samma senaste hash.
+9. Båda kedjorna rapporterades som giltiga.
+10. Journaltexten söktes i båda blockkedjorna och förekom inte där.
+
+Vid testet hade båda noderna tre block: genesis-blocket samt audit-block för
+`CREATE_JOURNAL_ENTRY` och `READ_JOURNAL`.
+
+Serverns automatiska testsvit hade dessutom 85 av 85 godkända tester.
+Frontendens lint kördes utan varningar eller fel och frontendens
+produktionsbygge slutfördes utan fel.
 
 ## 14. Socket.io / realtid
 
 - [ ] Socket-anslutning fungerar
 - [ ] Klient kan ta emot relevanta events
 - [ ] Journaluppdatering kan visas utan onödig manuell omladdning
-- [ ] P2P-events fungerar mellan servernoder
-- [ ] Medicinsk journaltext läcker inte via audit-events
+- [x] P2P-events fungerar mellan servernoder
+- [x] Medicinsk journaltext läcker inte via audit-events
 
 ## 15. Fork-hantering
 
@@ -203,9 +228,9 @@ Om funktionen ingår i slutversionen:
 - [ ] Ingen riktig .env är commitad
 - [ ] Inga privata nycklar är commitade
 - [ ] Lösenord lagras inte i klartext
-- [ ] Backend kontrollerar authorization
-- [ ] URL-manipulation ger inte otillåten åtkomst
-- [ ] Medicinsk journaltext finns inte i blockchain
+- [x] Backend kontrollerar authorization
+- [x] URL-manipulation ger inte otillåten åtkomst
+- [x] Medicinsk journaltext finns inte i blockchain
 
 ## 20. README inför inlämning
 
