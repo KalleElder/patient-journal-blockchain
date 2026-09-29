@@ -1,16 +1,10 @@
+import { ROLE_LABEL } from "../roles";
+
 // En händelse ur blockkedjans auditlogg. Innehåller bara metadata, aldrig journaltext.
 const ACTION_LABEL = {
   READ_JOURNAL: "Läste journalen",
   CREATE_JOURNAL_ENTRY: "Skrev en anteckning",
   ACCESS_DENIED: "Nekad åtkomst",
-};
-
-const ROLE_LABEL = {
-  DOCTOR: "Läkare",
-  NURSE: "Sjuksköterska",
-  CARE_CENTER: "Vårdcentral",
-  PATIENT: "Patient",
-  UNAUTHORIZED: "Obehörig",
 };
 
 export default function AuditEvent({ event, blockIndex, showPatient = false }) {

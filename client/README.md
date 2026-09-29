@@ -65,6 +65,9 @@ Frontend känner till exakt de roller backend använder, se `src/roles.js`:
 - PATIENT
 - UNAUTHORIZED
 
+I gränssnittet visas rollerna på svenska (Läkare, Sjuksköterska, Vårdcentral,
+Patient), se `ROLE_LABEL` i `src/roles.js`.
+
 DOCTOR, NURSE och CARE_CENTER räknas som vårdpersonal och får patientlistan.
 PATIENT landar direkt i sin egen journal. Alla andra roller får "Åtkomst nekad".
 
@@ -166,9 +169,9 @@ en egen terminal med en annan backend-URL och port:
 Testat i webbläsare mot backend på main:
 
 - frontend startar och login-sidan visas
-- `doctor1` + rätt lösenord loggar in och visar "Roll: DOCTOR"
+- `doctor1` + rätt lösenord loggar in och visar namn och "Läkare" i toppraden
 - fel lösenord ger "Felaktiga inloggningsuppgifter."
-- `patient1` loggar in, visar "Roll: PATIENT" och sitt patient-ID
+- `patient1` loggar in, visar "Patient" i toppraden och sitt patient-ID
 - refresh behåller inloggningen via `GET /api/auth/me`
 - logga ut rensar sessionen och visar login-sidan
 - `npm run install:all` från projektroten installerar både server och client
@@ -192,6 +195,7 @@ Testat i webbläsare mot backend på main:
   journalen dyker händelsen upp live hos `nurse1`, även "Nekad åtkomst"
 - åtkomstloggen på Node 2 innehåller händelserna som skapades via Node 1
 - livepanelen hamnar under innehållet på mobilbredd, utan horisontell scroll
+- en öppning av journalen ger exakt en "Läste journalen" i åtkomstloggen
 - `npm run lint` och `npm run build` går igenom
 
 ## Implementerat
