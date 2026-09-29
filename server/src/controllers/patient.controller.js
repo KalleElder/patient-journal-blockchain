@@ -52,7 +52,8 @@ function getPatientAccessLogs(req, res) {
     return res.status(404).json({ error: 'Patienten hittades inte' });
   }
 
-  const logs = getAuditChain().chain
+  const chain = getAuditChain();
+  const logs = chain.chain
     .slice(1)
     .filter((block) => block.data.patientId === patientId)
     .map((block) => ({
@@ -63,7 +64,10 @@ function getPatientAccessLogs(req, res) {
       timestamp: block.data.timestamp,
     }));
 
-  return res.json({ patientId, logs });
+  // Gäller hela den delade kedjan, inte bara den här patientens poster. Ett
+  // manipulerat block för en annan patient gör hela historiken osäker, så
+  // fältet ska inte läsas som "just dessa loggar är verifierade".
+  return res.json({ patientId, logs, verified: chain.isChainValid() });
 }
 
 function getPatient(req, res) {
