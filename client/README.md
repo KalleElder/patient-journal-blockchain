@@ -26,7 +26,8 @@ Backend måste köra samtidigt (`npm run start:server`, port 3001).
 
 Frontend anropar alltid relativa sökvägar som `/api/auth/login`. Vites
 dev-server skickar vidare allt under `/api` till backend, se `vite.config.js`.
-Därför behövs ingen CORS-inställning i backend under utveckling.
+Därför behövs ingen CORS-inställning i backend under utveckling. Socket.io
+för liveaktiviteten går samma väg (`/socket.io`, även websockets).
 
 Vilken backend som används styrs av `VITE_API_URL` (default
 `http://localhost:3001`). Kopiera `.env.example` till `.env` om du vill ändra.
@@ -88,11 +89,49 @@ Följer `docs/api-contract.md`.
 Felsvar från backend visas som text: 403 ("Du har inte behörighet..."),
 404 ("Patienten hittades inte.") och 400 vid ogiltig anteckning.
 
+## Åtkomstlogg
+
+Journalvyn har två flikar: **Journal** och **Åtkomstlogg**.
+
+Åtkomstloggen hämtas från `GET /api/patients/:id/access-logs`, som läser
+blockkedjans audit-block. Varje rad visar vad som hände (Läste journalen,
+Skrev en anteckning, Nekad åtkomst), rollen, användar-ID och tidpunkt,
+nyast först. Nekade försök markeras med rött.
+
+Vårdpersonal ser loggen för den patient de har öppnat. En patient ser bara
+sin egen logg. Försöker en patient läsa en annan patients logg svarar backend
+403 och frontend visar "Du har inte behörighet att se åtkomstloggen."
+
+Loggen innehåller bara metadata. Journaltext finns aldrig i blockkedjan och
+visas därför aldrig här.
+
+## Liveaktivitet
+
+Vårdpersonal ser en panel "Live" bredvid patientlistan och journalen (under
+innehållet på smal skärm). När noden skapar ett audit-block skickar den
+`NEW_BLOCK` över Socket.io till alla anslutna, och panelen visar händelsen
+direkt med blocknummer, roll, användar-ID, patient-ID och tid. Frontend
+lyssnar bara och skickar aldrig något över socketen.
+
+Panelen visar händelser från den nod frontend är ansluten till. Block som
+skapas på den andra noden synkas över P2P och syns i åtkomstloggen på båda
+noderna, men noden skickar bara `NEW_BLOCK` till webbläsare för block den
+själv har skapat.
+
+Patienter får ingen livepanel, eftersom den visar händelser för alla patienter.
+
+## Två noder lokalt
+
+Starta Node 1 och Node 2 enligt rot-README:n. Frontend för Node 2 startas i
+en egen terminal med en annan backend-URL och port:
+
+    VITE_API_URL=http://localhost:3002 npm run dev -- --port 5174
+
 ## Struktur
 
     client/
     ├── index.html
-    ├── vite.config.js              proxy /api -> backend
+    ├── vite.config.js              proxy /api och /socket.io -> backend
     ├── .env.example
     └── src/
         ├── main.jsx
@@ -103,11 +142,14 @@ Felsvar från backend visas som text: 403 ("Du har inte behörighet..."),
         ├── pages/LoginPage.jsx
         ├── pages/HomePage.jsx      rollbaserad startsida
         ├── pages/PatientListPage.jsx  patientlista med sökfilter (vårdpersonal)
-        ├── pages/JournalPage.jsx   journalvy för en patient
+        ├── pages/JournalPage.jsx   journalvy med flikarna Journal och Åtkomstlogg
         └── components/
             ├── UserBar.jsx
             ├── JournalEntry.jsx    en anteckning med synlighetstagg
-            └── NewEntryForm.jsx    formulär för ny anteckning (vårdpersonal)
+            ├── NewEntryForm.jsx    formulär för ny anteckning (vårdpersonal)
+            ├── AccessLog.jsx       åtkomstloggen för en patient
+            ├── AuditEvent.jsx      en händelse ur auditloggen
+            └── LiveActivity.jsx    livepanel via Socket.io (vårdpersonal)
 
 ## Testat
 
@@ -128,6 +170,15 @@ Testat i webbläsare mot backend på main:
 - `patient1` landar i "Min journal", ser bara `ALL`-anteckningar, ingen
   patientlista och inget formulär
 - `nurse1` och `carecenter1` ser patientlistan
+- `doctor1` ser åtkomstloggen för patienten, nyast först, utan journaltext
+- `carecenter1` ser åtkomstloggen
+- `patient1` ser sin egen åtkomstlogg men ingen livepanel
+- `patient1` som ändrar sitt patient-ID i `localStorage` nekas både journal
+  och åtkomstlogg (403 från backend, felmeddelande i frontend)
+- med två webbläsare på samma nod: när `doctor1` läser eller skriver i
+  journalen dyker händelsen upp live hos `nurse1`, även "Nekad åtkomst"
+- åtkomstloggen på Node 2 innehåller händelserna som skapades via Node 1
+- livepanelen hamnar under innehållet på mobilbredd, utan horisontell scroll
 - `npm run lint` och `npm run build` går igenom
 
 ## Implementerat
@@ -142,9 +193,11 @@ Testat i webbläsare mot backend på main:
 - patientlista med sökfilter
 - journalvy med synlighetstaggar
 - skapa journalanteckning
+- åtkomstlogg per patient
+- liveaktivitet via Socket.io
 
 ## Inte implementerat ännu
 
-- åtkomstlogg i journalvyn (endpointen finns sedan #15)
-- blockchain verification
-- Socket.io / liveuppdateringar
+- verification badge: väntar på Verification API från backend
+  (gruppkontraktet: Tim, Yamfu och Josef kommer överens om hur verifiering
+  visas)
