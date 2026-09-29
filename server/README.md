@@ -1,254 +1,387 @@
 # Server
 
-Serverdelen av Patient Journal Blockchain.
+Backenddelen av Patient Journal Blockchain.
 
-Serverdelen kommer att innehålla backend, blockchain och P2P-kommunikation.
+Servern innehåller Express-API, SQLite-integration, authentication,
+authorization, audit logging, blockchain och P2P-synkronisering.
 
-## Huvudansvariga
+## Ansvarsområden
 
-### Yamfu - Backend
+### Yamfu - Backend, SQL och behörigheter
 
-Yamfu ansvarar huvudsakligen för:
+Huvudansvar:
 
 - Express backend
 - API-routes
-- SQL-integration
-- Authentication
-- Authorization
-- Roller och behörigheter
-- Patienthantering
-- Journalhantering
-- AuditLogger
-- Access log API
-- Verification API
+- SQLite
+- authentication med bcrypt och JWT
+- authorization och roller
+- patienter och journalanteckningar
+- access-log API
 
 ### Tim - Blockchain och P2P
 
-Tim ansvarar huvudsakligen för:
+Huvudansvar:
 
-- Block
-- Blockchain
-- Hashing
-- Chain validation
-- Access logs
-- Digital signering
-- Signature verification
-- Merkle Tree
+- Block och Blockchain
+- SHA-256-hashning
+- chain validation
+- audit logs
+- Ed25519-signering
+- verifiering av signaturer
 - P2P-kommunikation
 - Socket.io mellan noder
-- Blockchain-synkronisering
-- Fork-hantering
-- Longest-chain rule
+- blockchain-synkronisering
+- fork-hantering
 
-## Planerad struktur
+Merkle Tree återstår att implementera.
 
-Serverdelen planeras ungefär enligt följande:
+Kalle arbetar med integration, gemensam projektsetup, tester och dokumentation.
 
-    server/
-    ├── routes/
-    ├── controllers/
-    ├── middleware/
-    ├── services/
-    ├── db/
-    ├── blockchain/
-    └── p2p/
+## Arkitektur
 
-Den exakta strukturen kan ändras när implementationen påbörjas.
+Det huvudsakliga flödet är:
 
-## Backend
+```text
+Frontend
+   |
+   v
+Express API
+   |
+   +--> Authentication / Authorization
+   |
+   +--> SQLite
+   |      |
+   |      +--> users
+   |      +--> patients
+   |      +--> journal_entries
+   |
+   +--> AuditLogger
+          |
+          v
+      Blockchain
+          |
+          v
+      P2P / Socket.io
+```
 
-Backend ansvarar för kommunikationen mellan frontend och systemets data.
+Medicinska journaluppgifter lagras endast i SQL.
 
-Backend ska bland annat:
+Blockchain innehåller audit-metadata om journalåtkomst och får aldrig innehålla
+medicinsk journaltext.
 
-- hantera login
-- identifiera användaren
-- kontrollera användarens roll
-- kontrollera behörighet
-- läsa patientdata från SQL
-- läsa journaldata från SQL
-- skapa journalanteckningar i SQL
-- skapa audit events vid journalåtkomst
-- kommunicera med blockchain-modulen
+## Installation
 
-Frontend får aldrig vara den enda platsen där behörighet kontrolleras.
+Den fullständiga installationsguiden finns i projektets root-README.
 
-## SQL
+Från projektroten installeras dependencies med:
 
-Medicinska journaluppgifter lagras i SQL-databasen.
+```bash
+npm run install:all
+```
 
-Exempel:
+Skapa därefter lokal miljökonfiguration:
+
+```bash
+cp .env.example .env
+```
+
+`.env` ska innehålla ett lokalt `JWT_SECRET` samt blockchainens
+signeringskonfiguration.
+
+Generera Ed25519-nycklar med:
+
+```bash
+npm run keys:generate --prefix server
+```
+
+Lägg de genererade värdena för `BLOCKCHAIN_PRIVATE_KEY` och
+`BLOCKCHAIN_TRUSTED_KEYS` i `.env`.
+
+Den privata nyckeln och `.env` får aldrig committas.
+
+## Databas
+
+SQLite används för:
 
 - användare
 - patienter
 - journalanteckningar
-- roller och relationer som behövs för behörighet
 
-SQL-strukturen dokumenteras under:
+Databasschemat finns i:
 
-database/
+```text
+database/schema.sql
+```
 
-## AuditLogger
+Testdata finns i:
 
-Backend ska ha ett gemensamt sätt att skapa audit events när
-journalinformation används.
+```text
+database/seed.sql
+```
 
-Planerat flöde:
+Initiera databasen från projektroten:
 
-    Request
-       |
-       v
-    Authentication
-       |
-       v
-    Authorization
-       |
-       v
-    Journal / Database operation
-       |
-       v
-    AuditLogger
-       |
-       v
-    Blockchain
+```bash
+npm run db:init
+```
 
-Audit-eventet ska endast innehålla information om åtkomsten.
+Kommandot skapar om den lokala databasen från grunden och lägger in testdata.
 
-Medicinsk journaltext får inte skickas till blockchain som audit-data.
+Standardfilen är:
 
-## Blockchain
+```text
+database/patient_journal.db
+```
 
-Blockchain används för access logs.
+Databasfilen committas inte.
 
-Ett block ska kunna kopplas till föregående block genom previousHash
-och verifieras genom hashing.
-
-Mer avancerade funktioner planeras att byggas på efter att den
-grundläggande kedjan fungerar.
-
-Dessa inkluderar:
-
-- digital signering
-- signature verification
-- Merkle Tree
-- P2P-synkronisering
-- fork-hantering
-
-## P2P
-
-Projektet ska kunna köra minst två samtidiga servrar.
-
-Exempel:
-
-    localhost:3001
-    localhost:3002
-
-Noderna ska kunna kommunicera och synkronisera relevant information.
-
-Socket.io kan användas för kommunikationen mellan noderna.
-
-## Integration
-
-Backend och blockchain ska använda det gemensamma audit-formatet som
-dokumenteras i:
-
-docs/api-contract.md
-
-Yamfu och Tim ansvarar tillsammans för att gränssnittet mellan deras
-delar fungerar.
-
-Kalle hjälper till med integration och dokumentation när delarna ska
-kopplas ihop.
-
-## Viktig regel
-
-Medicinsk journaltext lagras i SQL.
-
-Access logs lagras i blockchain.
-
-Medicinsk journaltext får aldrig lagras i blockchain.
-
-## Status
-
-Serverdelen är ännu inte implementerad.
-
-Första målet är att få ett enkelt fungerande flöde från backend till
-SQL och blockchain innan mer avancerade funktioner byggs.
-
-## Implementerat i första auth-versionen
-
-Avsnitten ovan bevarar projektets ursprungliga plan och status före denna PR.
-Nu finns Express-grunden, authentication och SQLite-databasen enligt nedan.
-Övrig planerad funktionalitet ovan (patient-/journal-API, auditLogger,
-blockchain-integration) är inte implementerad ännu.
-
-### Installation och start
+## Starta servern
 
 Från projektroten:
 
-```powershell
-npm install --prefix server
-# Endast om .env saknas:
-Copy-Item .env.example .env
+```bash
+npm run start:server
 ```
 
-Ange ett eget lokalt `JWT_SECRET` i projektrotens `.env`. Variabeln är
-obligatorisk; servern stoppar om den saknas. Committa aldrig `.env` eller
-`node_modules/`. Servern läser rotens `.env` oavsett arbetskatalog.
-`PORT` använder 3001 om den saknas.
+Servern kör som standard på:
 
-Kör `npm run db:init` (från projektroten) eller `npm run db:init --prefix
-server` för att skapa SQLite-databasen med tabeller och testdata. Detta
-skapar om databasfilen från grunden varje gång. `DB_PATH` i `.env` styr var
-filen hamnar, relativt projektroten; standard är `database/patient_journal.db`.
-Databasfilen committas aldrig (se `.gitignore`).
-
-Starta från projektroten med `npm run start:server`, eller från `server/`
-med `npm start`. För utveckling finns `npm run dev` i `server/`.
-
-Servern kör som en nod i P2P-nätverket. `PORT` styr vilken port noden lyssnar
-på och `PEER_URL` vilka grannar den ansluter till. Lämnas `PEER_URL` tom kör
-noden ensam. Två noder startas i varsin terminal från `server/`:
-
-```powershell
-$env:PORT=3001; $env:PEER_URL="http://localhost:3002"; npm start
-$env:PORT=3002; $env:PEER_URL="http://localhost:3001"; npm start
+```text
+http://localhost:3001
 ```
 
-Se `server/src/p2p/README.md` för hur synkroniseringen fungerar.
+Health check:
 
-### Tillgängliga routes
+```text
+GET /api/health
+```
 
-- `GET /api/health`: publik, returnerar 200 med
-  `{"status":"ok","service":"patient-journal-backend"}`.
-- `POST /api/auth/login`: tar JSON med `username` och `password`.
-  Returnerar 200 med `token` och `user` (`id`, `name`, `role`, samt
-  `patientId` för PATIENT). Felaktiga uppgifter ger ett generellt 401-svar.
-- `GET /api/auth/me`: kräver `Authorization: Bearer <token>` och returnerar
-  verifierad `user` med `userId`, `role` och eventuellt `patientId`.
-  Saknad eller ogiltig token ger 401.
-- `GET /api/patients`: kräver token. `DOCTOR`/`NURSE`/`CARE_CENTER` får en
-  lista patienter (200). `PATIENT` nekas (403).
-- `GET /api/patients/:id`: kräver token. Vårdpersonal får patienten (200)
-  eller 404 om den saknas. `PATIENT` får sin egen patient (200/404), men
-  403 på ett annat `:id`.
-- `GET /api/patients/:id/journal`: kräver token, samma behörighet som ovan
-  plus 404 för okänd patient. Vårdpersonal ser `STAFF`- och `ALL`-poster,
-  samt egna `PRIVATE`-poster. `PATIENT` ser endast `ALL`-poster för sin
-  egen patient.
-- `POST /api/patients/:id/journal`: kräver token och vårdpersonal-roll
-  (403 för `PATIENT`). Body: `{ "content": "...", "visibility": "PRIVATE" | "STAFF" | "ALL" }`.
-  Tomt/whitespace-`content` eller ogiltig `visibility` ger 400, okänd
-  patient ger 404. Lyckad post ger 201 med `id`, `patientId`, `authorId`,
-  `authorName`, `content`, `visibility`, `createdAt`. `patientId` tas
-  endast från URL:en, `authorId` endast från den inloggade användaren.
+För utveckling kan servern även startas från `server/` med:
 
-JWT gäller i en timme. Lösenord och `passwordHash` returneras aldrig.
+```bash
+npm run dev
+```
 
-### Tillfälliga syntetiska användare
+## Authentication och roller
 
-`doctor1` (DOCTOR), `nurse1` (NURSE), `carecenter1` (CARE_CENTER) och
-`patient1` (PATIENT) använder testlösenordet `password123`. Kontona läggs in
-av `database/seed.sql` när `npm run db:init` körs. Endast bcrypt-hashar
-lagras, i SQLite-tabellen `users`. Kontona är för lokal testning.
-UNAUTHORIZED beskriver ett obehörigt tillstånd och har inget testkonto.
+Systemet använder bcrypt för lösenord och JWT för authentication.
+
+JWT gäller i en timme.
+
+Rollerna som används av backend är:
+
+- `DOCTOR`
+- `NURSE`
+- `CARE_CENTER`
+- `PATIENT`
+
+Obehöriga requests utan giltig authentication behandlas som obehöriga och får
+inte åtkomst till skyddade routes.
+
+Backend ansvarar alltid för authorization. Frontend är aldrig den enda
+behörighetskontrollen.
+
+## Journalens synlighetsnivåer
+
+Journalanteckningar har någon av följande nivåer:
+
+- `PRIVATE` - endast användaren som skapade anteckningen
+- `STAFF` - vårdpersonal
+- `ALL` - vårdpersonal och rätt patient
+
+Patientkonton får endast läsa sin egen journal och endast anteckningar med
+`ALL`.
+
+## API
+
+### Publika routes
+
+#### `GET /api/health`
+
+Returnerar serverstatus.
+
+#### `POST /api/auth/login`
+
+Body:
+
+```json
+{
+  "username": "doctor1",
+  "password": "password123"
+}
+```
+
+Vid korrekt login returneras JWT-token och användarinformation.
+
+### Skyddade routes
+
+#### `GET /api/auth/me`
+
+Returnerar den verifierade inloggade användaren.
+
+#### `GET /api/patients`
+
+Vårdpersonal kan lista patienter.
+
+Patientkonton nekas åtkomst.
+
+#### `GET /api/patients/:id`
+
+Vårdpersonal kan läsa patientdata.
+
+Patientkonton kan endast läsa sin egen patient.
+
+#### `GET /api/patients/:id/journal`
+
+Returnerar journalanteckningar som den inloggade användaren har behörighet att
+se.
+
+#### `POST /api/patients/:id/journal`
+
+Vårdpersonal kan skapa en journalanteckning.
+
+Exempel:
+
+```json
+{
+  "content": "Patienten mår bättre.",
+  "visibility": "ALL"
+}
+```
+
+Journaltexten lagras i SQLite och skickas aldrig till blockchain.
+
+#### `GET /api/patients/:id/access-logs`
+
+Returnerar audit-historik för patienten enligt användarens behörighet.
+
+Genesis-blocket returneras inte som en access log.
+
+Det mer detaljerade API-kontraktet finns i:
+
+```text
+docs/api-contract.md
+```
+
+## Audit logging
+
+Journalflödet är kopplat till ett gemensamt `AuditLogger`-lager.
+
+Implementerade audit-events omfattar:
+
+- `READ_JOURNAL`
+- `CREATE_JOURNAL_ENTRY`
+- `ACCESS_DENIED`
+
+Audit-data innehåller metadata som:
+
+- `userId`
+- `patientId`
+- `role`
+- `action`
+- `timestamp`
+
+Medicinsk journaltext får aldrig ingå i audit-data.
+
+## Blockchain
+
+Blockchainen implementerar bland annat:
+
+- deterministiskt genesis block
+- SHA-256
+- deterministisk serialisering
+- `previousHash`
+- validering av kedjan
+- validering av audit-data
+- Ed25519-signering av audit-block
+- verifiering mot betrodda publika nycklar
+
+Genesis-blocket är osignerat. Audit-block ska vara korrekt signerade av en
+betrodd nyckel.
+
+Blockchainen ligger för närvarande i minnet och återställs när servern startas
+om.
+
+Mer information finns i:
+
+```text
+server/src/blockchain/README.md
+```
+
+## P2P
+
+P2P-synkronisering använder Socket.io.
+
+Noderna utbyter bland annat:
+
+- `REQUEST_CHAIN`
+- `CHAIN`
+- `NEW_BLOCK`
+
+En mottagen kedja eller ett mottaget block valideras innan det accepteras.
+
+En giltig längre kedja kan ersätta den lokala kedjan. Vid två giltiga kedjor
+med samma längd används hashen på sista blocket som deterministisk
+tie-breaker; lägst hash vinner.
+
+En kortare kedja ersätter inte en längre kedja.
+
+### Två noder
+
+Exempel från projektroten:
+
+```bash
+PORT=3001 PEER_URL=http://localhost:3002 npm start --prefix server
+PORT=3002 PEER_URL=http://localhost:3001 npm start --prefix server
+```
+
+Noderna behöver lita på varandras publika signeringsnycklar. Två lokala noder
+som använder samma `.env` kan därför kommunicera direkt i den nuvarande
+testkonfigurationen.
+
+Mer information finns i:
+
+```text
+server/src/p2p/README.md
+```
+
+## Testanvändare
+
+Efter `npm run db:init` finns följande lokala testkonton:
+
+| Användarnamn | Lösenord | Roll |
+| --- | --- | --- |
+| `doctor1` | `password123` | `DOCTOR` |
+| `nurse1` | `password123` | `NURSE` |
+| `carecenter1` | `password123` | `CARE_CENTER` |
+| `patient1` | `password123` | `PATIENT` |
+
+Testkontona är endast avsedda för lokal utveckling och demonstration.
+
+## Tester
+
+Från projektroten:
+
+```bash
+npm run test:server
+```
+
+Den 27 september 2026 verifierades den aktuella versionen med:
+
+```text
+126 tester
+126 godkända
+0 misslyckade
+```
+
+Testerna täcker bland annat authentication, behörigheter, journal-API,
+access logs, audit logging, blockchain, signering, fork-hantering och
+P2P-synkronisering.
+
+## Viktig säkerhetsregel
+
+**Medicinsk journaltext lagras i SQL.**
+
+**Audit logs lagras i blockchain.**
+
+**Medicinsk journaltext får aldrig lagras i blockchain.**
