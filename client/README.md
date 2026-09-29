@@ -105,6 +105,16 @@ sin egen logg. Försöker en patient läsa en annan patients logg svarar backend
 Loggen innehåller bara metadata. Journaltext finns aldrig i blockkedjan och
 visas därför aldrig här.
 
+Överst i fliken visas en verifieringsbadge. Backend skickar `verified` i
+samma svar, från blockkedjans egen `isChainValid()`. Den gäller hela den
+delade kedjan, inte bara den här patientens poster:
+
+- `true`: grön "Kedjan verifierad"
+- `false`: röd "Verifiering misslyckades"
+- saknas fältet visas ingen badge
+
+Frontend verifierar ingenting själv, den visar bara svaret från backend.
+
 ## Liveaktivitet
 
 Vårdpersonal ser en panel "Live" bredvid patientlistan och journalen (under
@@ -172,6 +182,9 @@ Testat i webbläsare mot backend på main:
 - `nurse1` och `carecenter1` ser patientlistan
 - `doctor1` ser åtkomstloggen för patienten, nyast först, utan journaltext
 - `carecenter1` ser åtkomstloggen
+- åtkomstloggen visar "Kedjan verifierad" när backend svarar `verified: true`,
+  och "Verifiering misslyckades" när svaret är `false` (testat med ett
+  simulerat svar)
 - `patient1` ser sin egen åtkomstlogg men ingen livepanel
 - `patient1` som ändrar sitt patient-ID i `localStorage` nekas både journal
   och åtkomstlogg (403 från backend, felmeddelande i frontend)
@@ -194,10 +207,5 @@ Testat i webbläsare mot backend på main:
 - journalvy med synlighetstaggar
 - skapa journalanteckning
 - åtkomstlogg per patient
+- verifieringsbadge för blockkedjan i åtkomstloggen
 - liveaktivitet via Socket.io
-
-## Inte implementerat ännu
-
-- verification badge: väntar på Verification API från backend
-  (gruppkontraktet: Tim, Yamfu och Josef kommer överens om hur verifiering
-  visas)

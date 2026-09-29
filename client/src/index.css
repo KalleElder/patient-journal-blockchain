@@ -263,6 +263,33 @@ select {
   color: #5f6b7a;
 }
 
+/* Verifieringsbadge (svaret från backend, gäller hela kedjan) */
+.verify {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.verify strong {
+  font-size: 1rem;
+}
+
+.verify-ok {
+  background: #e1f5e6;
+  border: 1px solid #a8dcb6;
+  color: #1f7a3a;
+}
+
+.verify-fail {
+  background: #fde8e8;
+  border: 1px solid #f3a9a3;
+  color: #b42318;
+}
+
 /* Rollen, användar-ID och patient-ID bryts hellre mellan delarna än mitt i. */
 .audit-meta span {
   white-space: nowrap;
