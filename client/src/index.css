@@ -198,3 +198,72 @@ select {
   border: 1px solid #b8c0c8;
   border-radius: 4px;
 }
+
+/* Flikar i journalvyn */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  border-bottom: 1px solid #d9dee3;
+}
+
+.tabs button {
+  background: none;
+  color: #5f6b7a;
+  border-radius: 4px 4px 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs button[aria-selected="true"] {
+  color: #1f6feb;
+  border-bottom-color: #1f6feb;
+  font-weight: 600;
+}
+
+/* Åtkomstlogg */
+.access-log > p.muted {
+  margin: 1rem 0 0;
+}
+
+.audit-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.audit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d9dee3;
+  border-left: 4px solid #1f6feb;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.audit-denied {
+  border-left-color: #b42318;
+  background: #fef6f6;
+}
+
+.audit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.audit-head time {
+  margin-left: auto;
+  color: #5f6b7a;
+}
+
+/* Rollen, användar-ID och patient-ID bryts hellre mellan delarna än mitt i. */
+.audit-meta span {
+  white-space: nowrap;
+}
