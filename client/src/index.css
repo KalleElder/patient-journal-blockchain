@@ -267,3 +267,95 @@ select {
 .audit-meta span {
   white-space: nowrap;
 }
+
+/* Liveaktivitet (vårdpersonal) */
+.live {
+  margin-top: 1rem;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #d9dee3;
+}
+
+.live h3 {
+  margin: 0;
+}
+
+.live > p.muted {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.live-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #5f6b7a;
+}
+
+.live-status::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #b8c0c8;
+}
+
+.live-status.on::before {
+  background: #1f7a3a;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.live .audit {
+  animation: live-in 0.8s ease-out;
+}
+
+.live .audit-head time {
+  flex-basis: 100%;
+  margin-left: 0;
+  font-size: 0.8rem;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes live-in {
+  from {
+    background: #e8f0fe;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-status.on::before,
+  .live .audit {
+    animation: none;
+  }
+}
+
+/* Bred skärm: liveaktiviteten som sidopanel */
+@media (min-width: 960px) {
+  main.with-live {
+    max-width: 960px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  main.with-live .live {
+    margin-top: 0;
+    position: sticky;
+    top: 1rem;
+  }
+}
