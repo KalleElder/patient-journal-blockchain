@@ -23,6 +23,20 @@ main {
   padding: 1.5rem;
   border-radius: 8px;
   border: 1px solid #d9dee3;
+  border-top: 4px solid #1f6feb;
+  box-shadow: 0 4px 16px rgba(31, 41, 51, 0.06);
+}
+
+/* Login: smalt kort mitt på sidan */
+main.login {
+  max-width: 400px;
+  margin-top: 12vh;
+}
+
+.login h1 {
+  margin: 0 0 1rem;
+  text-align: center;
+  font-size: 1.75rem;
 }
 
 label {
@@ -59,6 +73,33 @@ button:disabled {
   color: #b42318;
 }
 
+section > .error,
+.access-log > .error {
+  margin-top: 1rem;
+}
+
+section > h2 {
+  margin: 0 0 1rem;
+}
+
+/* Tangentbordsfokus syns alltid */
+:focus-visible {
+  outline: 2px solid #1f6feb;
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+  border-color: #1f6feb;
+}
+
+button[type="submit"]:hover:not(:disabled),
+.userbar button:hover {
+  background: #1a5fd0;
+}
+
 .status {
   text-align: center;
   margin-top: 3rem;
@@ -66,11 +107,43 @@ button:disabled {
 
 .userbar {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   align-items: center;
   padding: 0.75rem 1rem;
   background: #fff;
   border-bottom: 1px solid #d9dee3;
+}
+
+.userbar .brand {
+  font-weight: 700;
+  color: #1f6feb;
+}
+
+.userbar .who {
+  margin-left: auto;
+  color: #5f6b7a;
+}
+
+.userbar .who strong {
+  color: #1f2933;
+}
+
+.userbar button {
+  white-space: nowrap;
+}
+
+/* Smal skärm: appnamn och knapp på första raden, användaren under */
+@media (max-width: 600px) {
+  .userbar .who {
+    order: 3;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .userbar button {
+    margin-left: auto;
+  }
 }
 
 section {
@@ -102,6 +175,7 @@ section {
 
 .patient:hover {
   border-color: #1f6feb;
+  background: #f5f8ff;
 }
 
 .muted {
@@ -113,7 +187,11 @@ section {
   background: none;
   color: #1f6feb;
   padding: 0;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.link:hover {
+  text-decoration: underline;
 }
 
 /* Journal */
@@ -197,4 +275,197 @@ select {
   font-family: inherit;
   border: 1px solid #b8c0c8;
   border-radius: 4px;
+  background: #fff;
+}
+
+/* Flikar i journalvyn */
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  border-bottom: 1px solid #d9dee3;
+}
+
+.tabs button {
+  background: none;
+  color: #5f6b7a;
+  border-radius: 4px 4px 0 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.tabs button:hover {
+  color: #1f2933;
+}
+
+.tabs button[aria-selected="true"] {
+  color: #1f6feb;
+  border-bottom-color: #1f6feb;
+  font-weight: 600;
+}
+
+/* Åtkomstlogg */
+.access-log > p.muted {
+  margin: 1rem 0 0;
+}
+
+.audit-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.audit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d9dee3;
+  border-left: 4px solid #1f6feb;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.audit-denied {
+  border-left-color: #b42318;
+  background: #fef6f6;
+}
+
+.audit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.audit-head time {
+  margin-left: auto;
+  color: #5f6b7a;
+}
+
+/* Verifieringsbadge (svaret från backend, gäller hela kedjan) */
+.verify {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.verify strong {
+  font-size: 1rem;
+}
+
+.verify-ok {
+  background: #e1f5e6;
+  border: 1px solid #a8dcb6;
+  color: #1f7a3a;
+}
+
+.verify-fail {
+  background: #fde8e8;
+  border: 1px solid #f3a9a3;
+  color: #b42318;
+}
+
+/* Rollen, användar-ID och patient-ID bryts hellre mellan delarna än mitt i. */
+.audit-meta span {
+  white-space: nowrap;
+}
+
+/* Liveaktivitet (vårdpersonal) */
+.live {
+  margin-top: 1rem;
+  background: #fff;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid #d9dee3;
+}
+
+.live h3 {
+  margin: 0;
+}
+
+.live > p.muted {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.live-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #5f6b7a;
+}
+
+.live-status::before {
+  content: "";
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  background: #b8c0c8;
+}
+
+.live-status.on::before {
+  background: #1f7a3a;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.live .audit {
+  animation: live-in 0.8s ease-out;
+}
+
+.live .audit-head time {
+  flex-basis: 100%;
+  margin-left: 0;
+  font-size: 0.8rem;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes live-in {
+  from {
+    background: #e8f0fe;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-status.on::before,
+  .live .audit {
+    animation: none;
+  }
+}
+
+/* Bred skärm: liveaktiviteten som sidopanel */
+@media (min-width: 960px) {
+  main.with-live {
+    max-width: 960px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  main.with-live .live {
+    margin-top: 0;
+    position: sticky;
+    top: 1rem;
+  }
 }

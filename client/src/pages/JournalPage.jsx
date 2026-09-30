@@ -3,6 +3,7 @@ import { getJournal } from "../services/api";
 import { isStaff } from "../roles";
 import JournalEntry from "../components/JournalEntry";
 import NewEntryForm from "../components/NewEntryForm";
+import AccessLog from "../components/AccessLog";
 
 // Journalvyn för en patient. Backend filtrerar redan på behörighet och
 // synlighet (PRIVATE/STAFF/ALL), så listan visas som den kommer.
@@ -12,6 +13,8 @@ export default function JournalPage({ user, patient, onBack }) {
   const [loading, setLoading] = useState(true);
   // Räknas upp när en ny anteckning sparats, så att journalen hämtas om.
   const [version, setVersion] = useState(0);
+  // "journal" eller "log" (åtkomstloggen).
+  const [view, setView] = useState("journal");
 
   useEffect(() => {
     let active = true;
@@ -50,18 +53,33 @@ export default function JournalPage({ user, patient, onBack }) {
       <h2>{isStaff(user) ? `Journal: ${patient.name}` : "Min journal"}</h2>
       <p className="muted">Patient-ID: {patient.id}</p>
 
-      {isStaff(user) && <NewEntryForm patientId={patient.id} onCreated={reload} />}
+      <div className="tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={view === "journal"} onClick={() => setView("journal")}>
+          Journal
+        </button>
+        <button type="button" role="tab" aria-selected={view === "log"} onClick={() => setView("log")}>
+          Åtkomstlogg
+        </button>
+      </div>
 
-      {loading && <p className="status">Hämtar journal...</p>}
-      {error && <p className="error" role="alert">{error}</p>}
-      {!loading && !error && entries.length === 0 && (
-        <p className="status">Inga journalanteckningar att visa.</p>
+      {view === "log" && <AccessLog patientId={patient.id} />}
+
+      {view === "journal" && (
+        <>
+          {isStaff(user) && <NewEntryForm patientId={patient.id} onCreated={reload} />}
+
+          {loading && <p className="status">Hämtar journal...</p>}
+          {error && <p className="error" role="alert">{error}</p>}
+          {!loading && !error && entries.length === 0 && (
+            <p className="status">Inga journalanteckningar att visa.</p>
+          )}
+          <ul className="journal">
+            {entries.map((entry) => (
+              <JournalEntry key={entry.id} entry={entry} />
+            ))}
+          </ul>
+        </>
       )}
-      <ul className="journal">
-        {entries.map((entry) => (
-          <JournalEntry key={entry.id} entry={entry} />
-        ))}
-      </ul>
     </section>
   );
 }

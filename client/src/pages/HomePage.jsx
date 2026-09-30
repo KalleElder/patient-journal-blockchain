@@ -2,6 +2,7 @@ import { useState } from "react";
 import UserBar from "../components/UserBar";
 import PatientListPage from "./PatientListPage";
 import JournalPage from "./JournalPage";
+import LiveActivity from "../components/LiveActivity";
 import { ROLES, isStaff } from "../roles";
 
 // Startsidan efter login. Vad som visas beror på rollen från backend.
@@ -12,7 +13,7 @@ export default function HomePage({ user, onLogout }) {
   return (
     <>
       <UserBar user={user} onLogout={onLogout} />
-      <main>
+      <main className={isStaff(user) ? "with-live" : undefined}>
         {isStaff(user) && !patient && <PatientListPage onSelect={setPatient} />}
         {isStaff(user) && patient && (
           <JournalPage user={user} patient={patient} onBack={() => setPatient(null)} />
@@ -26,6 +27,7 @@ export default function HomePage({ user, onLogout }) {
             <p>Din roll har inte tillgång till journalsystemet.</p>
           </section>
         )}
+        {isStaff(user) && <LiveActivity />}
       </main>
     </>
   );

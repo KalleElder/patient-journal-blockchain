@@ -71,3 +71,7 @@ export function createJournalEntry(patientId, content, visibility) {
     body: JSON.stringify({ content, visibility }),
   });
 }
+
+export function getAccessLogs(patientId) {
+  return request(`/api/patients/${patientId}/access-logs`);
+}

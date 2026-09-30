@@ -6,7 +6,8 @@ const VISIBILITY_LABEL = {
 };
 
 function formatDate(iso) {
-  const date = new Date(iso);
+  // SQLite sparar created_at i UTC utan tidszon ("2026-09-29 17:20:35"), så den läses som UTC.
+  const date = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(iso) ? iso.replace(" ", "T") + "Z" : iso);
   return Number.isNaN(date.getTime()) ? iso : date.toLocaleString("sv-SE");
 }
 
