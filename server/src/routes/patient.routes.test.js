@@ -155,6 +155,7 @@ test('läkare kan läsa en patients access logs', async (t) => {
       action: 'READ_JOURNAL',
       timestamp: '2026-09-20T10:00:00.000Z',
     }],
+    verified: true,
   });
 });
 
@@ -185,6 +186,7 @@ test('patient kan läsa sina egna access logs', async (t) => {
   const body = await res.json();
   assert.strictEqual(body.patientId, 1);
   assert.strictEqual(body.logs[0].userId, 3);
+  assert.strictEqual(body.verified, true);
 });
 
 test('patient får 403 för en annan patients access logs', async (t) => {
@@ -194,6 +196,26 @@ test('patient får 403 för en annan patients access logs', async (t) => {
   const res = await call('/api/patients/2/access-logs', { tok: patientToken() });
   assert.strictEqual(res.status, 403);
   assert.deepStrictEqual(await res.json(), { error: 'Åtkomst nekad' });
+});
+
+// Samma manipulationsmönster som i blockchain.test.js: datat ändras men den
+// sparade hashen ligger kvar, vilket gör kedjan ogiltig utan att röra vilka
+// loggar som matchar patienten. verified ska spegla hela kedjans skick, inte
+// bara den här patientens poster, och loggarna ska fortfarande visas korrekt.
+test('verified är false när kedjan är manipulerad, men loggarna visas fortfarande', async (t) => {
+  const chain = isolateAuditChain(t);
+  addAuditEvent();
+
+  chain.chain[1].data.action = 'CREATE_JOURNAL_ENTRY';
+
+  const res = await call('/api/patients/1/access-logs', { tok: doctorToken() });
+  assert.strictEqual(res.status, 200);
+  const body = await res.json();
+
+  assert.strictEqual(body.logs.length, 1);
+  assert.strictEqual(body.logs[0].action, 'CREATE_JOURNAL_ENTRY');
+  assert.strictEqual(body.verified, false);
+  assert.strictEqual(chain.isChainValid(), false);
 });
 
 test('okänd patient ger 404 för access logs', async (t) => {
@@ -236,7 +258,8 @@ test('access logs innehåller endast tillåten audit-metadata', async (t) => {
   assert.strictEqual(res.status, 200);
   const body = await res.json();
 
-  assert.deepStrictEqual(Object.keys(body).sort(), ['logs', 'patientId']);
+  assert.deepStrictEqual(Object.keys(body).sort(), ['logs', 'patientId', 'verified']);
+  assert.strictEqual(typeof body.verified, 'boolean');
   assert.strictEqual(body.logs.length, 1);
   for (const log of body.logs) {
     assert.deepStrictEqual(
@@ -255,7 +278,7 @@ test('tom audit-historik ger en tom access-log-lista', async (t) => {
 
   const res = await call('/api/patients/2/access-logs', { tok: doctorToken() });
   assert.strictEqual(res.status, 200);
-  assert.deepStrictEqual(await res.json(), { patientId: 2, logs: [] });
+  assert.deepStrictEqual(await res.json(), { patientId: 2, logs: [], verified: true });
 });
 
 test('vårdpersonal kan skapa journalanteckning', async () => {

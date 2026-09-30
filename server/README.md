@@ -257,6 +257,10 @@ Returnerar audit-historik för patienten enligt användarens behörighet.
 
 Genesis-blocket returneras inte som en access log.
 
+Svaret innehåller även `verified`, direkt från blockchainens `isChainValid()`.
+Fältet gäller hela den delade audit-kedjan, inte bara den här patientens
+poster.
+
 Det mer detaljerade API-kontraktet finns i:
 
 ```text

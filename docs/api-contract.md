@@ -129,12 +129,17 @@ Response:
           "action": "READ_JOURNAL",
           "timestamp": "2026-09-20T10:00:00.000Z"
         }
-      ]
+      ],
+      "verified": true
     }
 
 Genesis-blocket och intern blockmetadata som index, hash och previousHash
 returneras inte. Responsen innehåller endast audit-metadata och aldrig
 medicinsk journaltext eller annan medicinsk information.
+
+`verified` kommer direkt från blockchainens egen `isChainValid()` och gäller
+hela den delade audit-kedjan, inte bara `:id`s egna poster. Ett manipulerat
+block för en annan patient gör alltså `verified: false` även här.
 
 ## Audit Event
 
