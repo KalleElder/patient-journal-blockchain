@@ -464,8 +464,40 @@ Följande finns på `main`:
 - val av `PRIVATE`, `STAFF` och `ALL`
 - patientkonto som går direkt till den egna journalen
 - felhantering för relevanta API-fel
+- åtkomstlogg per patient
+- liveaktivitet via Socket.io för vårdpersonal
+- verification badge för blockchainens verifieringsstatus
 
 Frontendens lint och production build har verifierats utan fel.
+
+### Screenshots
+
+#### Inloggning
+
+![Inloggningssida](docs/screenshots/login.png)
+
+Inloggning till Patient Journal med lokala testanvändare.
+
+#### Patientlista och liveaktivitet
+
+![Patientlista med liveaktivitet](docs/screenshots/patient-list-live.png)
+
+Vårdpersonal kan söka bland patienter och samtidigt se nya audit-händelser
+från blockchainen via Socket.io.
+
+#### Journal och liveaktivitet
+
+![Journalvy med liveaktivitet](docs/screenshots/journal-live.png)
+
+Journalvyn visar journalanteckningar och låter vårdpersonal skapa nya poster
+med rätt synlighetsnivå. Livepanelen visar audit-händelser i realtid.
+
+#### Åtkomstlogg och blockchain-verifiering
+
+![Åtkomstlogg med verifieringsstatus](docs/screenshots/access-log-verification.png)
+
+Åtkomstloggen visar audit-händelser från blockchainen. Verification badge
+visar om den delade audit-kedjan har verifierats av backend.
 
 ### Audit logging och blockchain
 
@@ -573,14 +605,21 @@ Båda kommandona slutfördes utan fel.
 
 ### Återstående arbete
 
-Följande delar återstår eller behöver slutverifieras:
+De planerade huvudfunktionerna är nu implementerade och integrerade på `main`.
+
+Slutverifieringen omfattar:
 
 - frontendvy för access logs
-- Socket.io-klient för liveuppdateringar i frontend
+- Socket.io-klient för liveuppdateringar
 - Merkle Tree
-- verification badge om den ingår i slutversionen
-- slutliga screenshots till README
-- slutlig demo och presentation
+- verification badge baserad på blockchainens verifieringsstatus
+- clean-clone installationstest
+- 148 av 148 godkända servertester
+- frontend-lint utan fel eller varningar
+- lyckad production build av frontend
+- manuellt integrationstest av journal, access logs, verification badge och liveaktivitet
 
-Den faktiska slutversionen dokumenteras i README efter den sista integrationen
-och sluttesterna.
+Följande återstår inför redovisningen:
+
+- slutlig demo
+- presentation
