@@ -45,7 +45,8 @@ därför alltid gå via `createAuditLog()`.
 | `keyring.js` | Nodens egen nyckel och vilka publika nycklar den litar på |
 | `generateKeys.js` | Skriver ut ett nytt nyckelpar att lägga i `.env` |
 | `index.js` | Modulens utsida, bland annat `createAuditLog()` |
-| `demo.js` | Demonstrationsscript |
+| `demo.js` | Demonstration av kedja, giltighet och avvisad journaltext |
+| `demoAvancerat.js` | Demonstration av signering, Merkle Tree och fork |
 | `blockchain.test.js` | Automatiska tester |
 | `sync.test.js` | Tester för synk mellan noder, utan nätverk |
 | `signing.test.js` | Tester för signering och verifiering |
@@ -369,6 +370,16 @@ Demon bygger en kedja med tre access logs och visar hasharna. Sedan görs två
 försök att få in journaltext, ett rakt via `content` och ett där texten göms i
 `userId`, och båda avvisas. Till sist ändras ett gammalt block så att
 valideringen slår till.
+
+Signering, Merkle Tree och fork mellan lika långa kedjor visas av ett eget
+script, eftersom de inte syns i de två andra:
+
+    node src/blockchain/demoAvancerat.js
+
+Det tar under en sekund. Först ändras ett block och hashen räknas om, så att
+hashen stämmer men signaturen inte gör det. Sedan visas ett Merkle-bevis som
+slutar gälla när ett annat block i kedjan ändras. Till sist möts två lika långa
+kedjor, och den med lägst hash på sista blocket blir kvar på båda.
 
 ## Implementerat
 
